@@ -436,10 +436,10 @@ class InterfazYuGiOh:
     def _abrir_config_deck(self):
         """Pide al usuario el tamaño del deck antes de iniciar/reiniciar"""
         current = getattr(self.juego, "tamanio_deck", 20)
-        val = simpledialog.askinteger("Config Deck", "Tamaño del deck por jugador (5-40):", initialvalue=current, minvalue=5, maxvalue=40)
+        val = simpledialog.askinteger("Config Deck", "Tamaño del deck por jugador (10-40):", initialvalue=current, minvalue=10, maxvalue=40)
         if val:
             # setear y reiniciar
-            self.juego.tamanio_deck = min(max(5, val), 40)
+            self.juego.tamanio_deck = min(max(10, val), 40)
             self._reiniciar_desde_interfaz()
 
     def _reiniciar_desde_interfaz(self):
