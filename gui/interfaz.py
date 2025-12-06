@@ -354,21 +354,27 @@ class InterfazYuGiOh:
     # Acciones del jugador (interfaz -> juego)
     # ---------------------------
     def seleccionar_carta_mano(self, carta):
-        """Preguntar si invocar esta carta (ataque por default)"""
+        """Invocar carta del jugador (ataque por defecto)"""
         if self.juego.turno_actual != self.juego.jugador_humano:
             messagebox.showwarning("Advertencia", "No es tu turno")
             return
-        # Solo mostrar dialogo sencillo
+
+        # Verificar si ya invocó una carta
+        if self.juego.humano_invoco_carta:
+            messagebox.showinfo("Aviso", "Solo puedes invocar una carta por turno")
+            return
+
+        # Preguntar si invocar carta
         respuesta = messagebox.askyesno("Invocar carta", f"Invocar {carta.nombre}?\nATK: {carta.atk}  DEF: {carta.defensa}")
         if respuesta:
             exito, msg = self.juego.jugar_carta_humano(carta, "ataque")
             if not exito:
                 messagebox.showerror("Error", msg)
-            # actualizar interfaz
             try:
                 self.actualizar_interfaz()
             except Exception:
                 pass
+
 
     def seleccionar_carta_campo(self, carta):
         """Selecciona carta atacante (modo atacar)"""

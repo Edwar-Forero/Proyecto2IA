@@ -14,6 +14,9 @@ class Juego:
             cartas_totales: Lista de todas las cartas disponibles
             tamanio_deck: Número de cartas por deck (máximo 40)
         """
+        self.humano_invoco_carta = False
+        self.ia_invoco_carta = False
+
         self.cartas_disponibles = cartas_totales
         self.tamanio_deck = min(tamanio_deck, 40)
         
@@ -66,8 +69,9 @@ class Juego:
         # Si el jugador presiona terminar turno, iniciamos la secuencia de la IA
         if self.turno_actual == self.jugador_humano:
             
-            # --- FASE IA ---
             self.turno_actual = self.jugador_ia
+            self.ia_invoco_carta = False  # <--- Resetear flag
+
             
             # 1. IA Roba carta
             carta = self.jugador_ia.robar_carta()
@@ -85,9 +89,10 @@ class Juego:
                 return
 
             # --- VUELTA AL JUGADOR ---
-            # Una vez la IA termina, devolvemos el control inmediatamente al humano
             self.turno_actual = self.jugador_humano
             self.fase = "main"
+            self.humano_invoco_carta = False  # <--- Resetear flag
+
             
             self.agregar_historial("-" * 20)
             self.agregar_historial("--- TU TURNO ---")
@@ -167,7 +172,6 @@ class Juego:
         self.verificar_ganador()
     
     def jugar_carta_humano(self, carta, posicion="ataque"):
-        """El jugador humano juega una carta"""
         if self.turno_actual != self.jugador_humano:
             return False, "No es tu turno"
         
@@ -179,10 +183,12 @@ class Juego:
         
         exito = self.jugador_humano.jugar_carta(carta, posicion)
         if exito:
+            self.humano_invoco_carta = True  # <--- Marcar que invocó
             self.agregar_historial(f"Invocaste: {carta.nombre} en posición {posicion}")
             return True, "Carta jugada exitosamente"
         
         return False, "Error al jugar la carta"
+
     
     def atacar_carta_humano(self, atacante, objetivo):
         """El jugador humano ataca con una carta"""
