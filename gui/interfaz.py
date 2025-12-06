@@ -1,395 +1,484 @@
+# interfaz.py
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
-from PIL import Image, ImageTk
+from tkinter import ttk, messagebox
+from tkinter import simpledialog
+from tkinter import scrolledtext
+from PIL import Image, ImageTk, ImageOps
 import os
 
 class InterfazYuGiOh:
-    """Interfaz gráfica principal del juego"""
-    
+    """
+    Interfaz reorganizada tipo tablero Yu-Gi-Oh:
+    - Campo central con 5 slots arriba (IA) y 5 abajo (Jugador).
+    - Mano con scroll horizontal en la parte inferior.
+    - Panel derecho: controles, indicador de turno y log.
+    - (Panel izquierdo eliminado).
+    - Permite configurar tamanio_deck y reiniciar.
+    """
+
+    SLOT_COUNT = 5
+    CARD_W = 100
+    CARD_H = 140
+    # MINI_W y MINI_H ya no son necesarios sin el panel izquierdo, 
+    # pero los dejo por si los usas en otro lado.
+    MINI_W = 48 
+    MINI_H = 68
+
     def __init__(self, root, juego):
         self.root = root
         self.juego = juego
-        self.root.title("Yu-Gi-Oh! Forbidden Memories - Minimax AI")
-        self.root.geometry("1400x900")
-        self.root.configure(bg="#2c3e50")
-        
-        # Variables para selección
+        self.root.title("Yu-Gi-Oh! - Minimax (Jugador vs IA)")
+        self.root.geometry("1200x900") # Reduje un poco el ancho ya que quitamos el panel
+        self.root.configure(bg="#0b1220")
+
+        # Variables de selección
         self.carta_seleccionada = None
-        self.modo_seleccion = None  # "atacar", "fusionar", None
-        self.carta_fusion_1 = None
-        
+        self.modo_seleccion = None  # "atacar" or None
+
         # Cache de imágenes
         self.imagenes_cache = {}
+
+        # conectar callback del juego
+        self.juego.on_actualizar_interfaz = self.actualizar_interfaz
+
+        # Crear layout completo
+        self._crear_layout()
         
-        self.crear_interfaz()
-        self.actualizar_interfaz()
-    
-    def crear_interfaz(self):
-        """Crea todos los componentes de la interfaz"""
-        
-        # Frame superior - Campo de la IA
-        frame_ia = tk.Frame(self.root, bg="#34495e", relief=tk.RAISED, bd=2)
-        frame_ia.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=(10, 5))
-        
-        # Info IA
-        info_ia = tk.Frame(frame_ia, bg="#34495e")
-        info_ia.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
-        
-        self.label_ia_nombre = tk.Label(info_ia, text="IA", font=("Arial", 16, "bold"), 
-                                         bg="#34495e", fg="#e74c3c")
-        self.label_ia_nombre.pack(side=tk.LEFT, padx=10)
-        
-        self.label_ia_vida = tk.Label(info_ia, text="LP: 8000", font=("Arial", 14), 
-                                       bg="#34495e", fg="#ecf0f1")
-        self.label_ia_vida.pack(side=tk.LEFT, padx=10)
-        
-        self.label_ia_deck = tk.Label(info_ia, text="Deck: 15", font=("Arial", 12), 
-                                       bg="#34495e", fg="#95a5a6")
-        self.label_ia_deck.pack(side=tk.LEFT, padx=10)
-        
-        self.label_ia_mano = tk.Label(info_ia, text="Mano: 5", font=("Arial", 12), 
-                                       bg="#34495e", fg="#95a5a6")
-        self.label_ia_mano.pack(side=tk.LEFT, padx=10)
-        
+        # Intentar actualizar vista inicial
+        try:
+            self.actualizar_interfaz()
+        except Exception:
+            pass
+
+    # ---------------------------
+    # Layout y creación widgets
+    # ---------------------------
+    def _crear_layout(self):
+        # Top bar: título + configuración
+        topbar = tk.Frame(self.root, bg="#071025", height=48)
+        topbar.pack(side=tk.TOP, fill=tk.X)
+        topbar.pack_propagate(False)
+        tk.Label(topbar, text="Yu-Gi-Oh: Minimax Duel", font=("Helvetica", 16, "bold"),
+                 bg="#071025", fg="#f6f6f6").pack(side=tk.LEFT, padx=12)
+        tk.Button(topbar, text="Configurar Deck", command=self._abrir_config_deck).pack(side=tk.LEFT, padx=8)
+        tk.Button(topbar, text="Reiniciar Juego", command=self._reiniciar_desde_interfaz).pack(side=tk.LEFT, padx=8)
+
+        # Main area: center board / right controls
+        main = tk.Frame(self.root, bg="#081426")
+        main.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=8, pady=8)
+
+        # Center panel: Board (IA arriba, jugador abajo)
+        center = tk.Frame(main, bg="#0b1220")
+        center.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self._crear_tablero(center)
+
+        # Right panel: controles y log
+        right = tk.Frame(main, bg="#071025", width=340)
+        right.pack(side=tk.RIGHT, fill=tk.Y, padx=(8,0))
+        right.pack_propagate(False)
+        self._crear_panel_derecho(right)
+
+    def _crear_tablero(self, parent):
         # Campo IA
-        self.frame_campo_ia = tk.Frame(frame_ia, bg="#34495e")
-        self.frame_campo_ia.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Frame central - Controles y log
-        frame_central = tk.Frame(self.root, bg="#2c3e50")
-        frame_central.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
-        
-        # Log de eventos
-        log_frame = tk.Frame(frame_central, bg="#34495e", relief=tk.SUNKEN, bd=2)
-        log_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
-        
-        tk.Label(log_frame, text="📜 Historial de Batalla", font=("Arial", 12, "bold"),
-                bg="#34495e", fg="#ecf0f1").pack(pady=5)
-        
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=8, width=50,
-                                                  bg="#2c3e50", fg="#ecf0f1",
-                                                  font=("Courier", 10))
-        self.log_text.pack(padx=5, pady=5, fill=tk.BOTH, expand=True)
-        
-        # Controles
-        controles_frame = tk.Frame(frame_central, bg="#34495e", relief=tk.RAISED, bd=2)
-        controles_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
-        
-        tk.Label(controles_frame, text="🎮 Controles", font=("Arial", 14, "bold"),
-                bg="#34495e", fg="#ecf0f1").pack(pady=10)
-        
-        self.btn_terminar_turno = tk.Button(controles_frame, text="Terminar Turno",
-                                            command=self.terminar_turno,
-                                            bg="#27ae60", fg="white",
-                                            font=("Arial", 12, "bold"),
-                                            width=15, height=2)
-        self.btn_terminar_turno.pack(pady=5, padx=10)
-        
-        self.btn_fusionar = tk.Button(controles_frame, text="Fusionar Cartas",
-                                      command=self.iniciar_fusion,
-                                      bg="#9b59b6", fg="white",
-                                      font=("Arial", 11),
-                                      width=15)
-        self.btn_fusionar.pack(pady=5, padx=10)
-        
-        self.btn_atacar = tk.Button(controles_frame, text="Modo Ataque",
-                                    command=self.modo_atacar,
-                                    bg="#e74c3c", fg="white",
-                                    font=("Arial", 11),
-                                    width=15)
-        self.btn_atacar.pack(pady=5, padx=10)
-        
-        self.btn_cancelar = tk.Button(controles_frame, text="Cancelar",
-                                      command=self.cancelar_accion,
-                                      bg="#95a5a6", fg="white",
-                                      font=("Arial", 10),
-                                      width=15)
-        self.btn_cancelar.pack(pady=5, padx=10)
-        
-        # Indicador de turno
-        self.label_turno = tk.Label(controles_frame, text="Tu Turno",
-                                    font=("Arial", 12, "bold"),
-                                    bg="#3498db", fg="white",
-                                    relief=tk.RAISED, bd=3,
-                                    width=15, height=2)
-        self.label_turno.pack(pady=10, padx=10)
-        
-        # Frame inferior - Campo del jugador
-        frame_jugador = tk.Frame(self.root, bg="#34495e", relief=tk.RAISED, bd=2)
-        frame_jugador.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True, padx=10, pady=(5, 10))
-        
-        # Campo jugador
-        self.frame_campo_jugador = tk.Frame(frame_jugador, bg="#34495e")
-        self.frame_campo_jugador.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Mano del jugador
-        mano_container = tk.Frame(frame_jugador, bg="#2c3e50", relief=tk.SUNKEN, bd=2)
-        mano_container.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
-        
-        tk.Label(mano_container, text="🃏 Tu Mano", font=("Arial", 12, "bold"),
-                bg="#2c3e50", fg="#ecf0f1").pack(pady=5)
-        
-        self.frame_mano = tk.Frame(mano_container, bg="#2c3e50")
-        self.frame_mano.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
-        
+        campo_ia_frame = tk.Frame(parent, bg="#0b1220")
+        campo_ia_frame.pack(side=tk.TOP, fill=tk.X, pady=(6,20))
+        # Info IA: LP y deck count
+        info_ia = tk.Frame(campo_ia_frame, bg="#071025")
+        info_ia.pack(side=tk.TOP, fill=tk.X, padx=12, pady=(2,6))
+        self.label_ia_nombre = tk.Label(info_ia, text="IA", bg="#071025", fg="#f35b5b", font=("Helvetica", 12, "bold"))
+        self.label_ia_nombre.pack(side=tk.LEFT, padx=(4,8))
+        self.label_ia_vida = tk.Label(info_ia, text="LP: 8000", bg="#071025", fg="#f7f7f7", font=("Helvetica", 12))
+        self.label_ia_vida.pack(side=tk.LEFT, padx=6)
+        self.label_ia_deckcount = tk.Label(info_ia, text="Deck: 0", bg="#071025", fg="#9aa3b2", font=("Helvetica",10))
+        self.label_ia_deckcount.pack(side=tk.LEFT, padx=6)
+
+        # Slots IA (5)
+        slots_ia = tk.Frame(campo_ia_frame, bg="#0b1220")
+        slots_ia.pack(side=tk.TOP, fill=tk.X, padx=20)
+        self.slots_ia = []
+        for i in range(self.SLOT_COUNT):
+            slot = tk.Frame(slots_ia, bg="#09203a", width=self.CARD_W, height=self.CARD_H+30, relief=tk.RIDGE, bd=2)
+            slot.pack(side=tk.LEFT, padx=10, pady=6)
+            slot.pack_propagate(False)
+            # placeholder label
+            lbl = tk.Label(slot, text="Vacío", bg="#09203a", fg="#9aa3b2")
+            lbl.pack(expand=True)
+            self.slots_ia.append(slot)
+
+        # Central separator (useful for messages)
+        mid_info = tk.Frame(parent, bg="#071025", height=24)
+        mid_info.pack(fill=tk.X, pady=(4,4))
+        mid_info.pack_propagate(False)
+        self.label_centro = tk.Label(mid_info, text="Batalla", bg="#071025", fg="#f6f6f6", font=("Helvetica", 11, "bold"))
+        self.label_centro.pack()
+
+        # Slots Jugador (5)
+        campo_player_frame = tk.Frame(parent, bg="#0b1220")
+        campo_player_frame.pack(side=tk.TOP, fill=tk.X, pady=(20,6))
+        # Slots
+        slots_player = tk.Frame(campo_player_frame, bg="#0b1220")
+        slots_player.pack(side=tk.TOP, fill=tk.X, padx=20)
+        self.slots_player = []
+        for i in range(self.SLOT_COUNT):
+            slot = tk.Frame(slots_player, bg="#102a3f", width=self.CARD_W, height=self.CARD_H+30, relief=tk.RIDGE, bd=2)
+            slot.pack(side=tk.LEFT, padx=10, pady=6)
+            slot.pack_propagate(False)
+            lbl = tk.Label(slot, text="Vacío", bg="#102a3f", fg="#cfe7ff")
+            lbl.pack(expand=True)
+            self.slots_player.append(slot)
+
         # Info jugador
-        info_jugador = tk.Frame(frame_jugador, bg="#34495e")
-        info_jugador.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
-        
-        self.label_jugador_nombre = tk.Label(info_jugador, text="Jugador", 
-                                              font=("Arial", 16, "bold"),
-                                              bg="#34495e", fg="#3498db")
-        self.label_jugador_nombre.pack(side=tk.LEFT, padx=10)
-        
-        self.label_jugador_vida = tk.Label(info_jugador, text="LP: 8000", 
-                                            font=("Arial", 14),
-                                            bg="#34495e", fg="#ecf0f1")
-        self.label_jugador_vida.pack(side=tk.LEFT, padx=10)
-        
-        self.label_jugador_deck = tk.Label(info_jugador, text="Deck: 15", 
-                                            font=("Arial", 12),
-                                            bg="#34495e", fg="#95a5a6")
-        self.label_jugador_deck.pack(side=tk.LEFT, padx=10)
-    
-    def cargar_imagen_carta(self, carta, width=100, height=140):
-        """Carga y redimensiona la imagen de una carta"""
-        key = f"{carta.id}_{width}_{height}"
-        
+        info_player = tk.Frame(campo_player_frame, bg="#071025")
+        info_player.pack(side=tk.TOP, fill=tk.X, padx=12, pady=(6,2))
+        self.label_player_nombre = tk.Label(info_player, text="Jugador", bg="#071025", fg="#77d0ff", font=("Helvetica", 12, "bold"))
+        self.label_player_nombre.pack(side=tk.LEFT, padx=(4,8))
+        self.label_player_vida = tk.Label(info_player, text="LP: 8000", bg="#071025", fg="#f7f7f7", font=("Helvetica", 12))
+        self.label_player_vida.pack(side=tk.LEFT, padx=6)
+        self.label_player_deckcount = tk.Label(info_player, text="Deck: 0", bg="#071025", fg="#9aa3b2", font=("Helvetica",10))
+        self.label_player_deckcount.pack(side=tk.LEFT, padx=6)
+
+        # Mano con canvas horizontal
+        mano_container = tk.Frame(parent, bg="#071025", height=170)
+        mano_container.pack(side=tk.TOP, fill=tk.X, pady=(10,4))
+        mano_container.pack_propagate(False)
+
+        tk.Label(mano_container, text="Tu Mano", bg="#071025", fg="#cfe7ff", font=("Helvetica", 10, "bold")).pack(anchor="w", padx=8, pady=(6,0))
+
+        self.canvas_mano = tk.Canvas(mano_container, bg="#071025", height=120, highlightthickness=0)
+        self.hscroll_mano = tk.Scrollbar(mano_container, orient=tk.HORIZONTAL, command=self.canvas_mano.xview)
+        self.canvas_mano.configure(xscrollcommand=self.hscroll_mano.set)
+        self.canvas_mano.pack(side=tk.TOP, fill=tk.X, expand=True, padx=8)
+        self.hscroll_mano.pack(side=tk.TOP, fill=tk.X, padx=8)
+
+        self.frame_mano = tk.Frame(self.canvas_mano, bg="#071025")
+        self.canvas_mano.create_window((0,0), window=self.frame_mano, anchor="nw")
+
+        def _on_mano_config(event):
+            self.canvas_mano.configure(scrollregion=self.canvas_mano.bbox("all"))
+        self.frame_mano.bind("<Configure>", _on_mano_config)
+
+    def _crear_panel_derecho(self, parent):
+        # Indicador de turno
+        turn_frame = tk.Frame(parent, bg="#071025")
+        turn_frame.pack(fill=tk.X, pady=(12,8), padx=12)
+        self.label_turno = tk.Label(turn_frame, text="Turno: -", bg="#071025", fg="#fff", font=("Helvetica", 13, "bold"))
+        self.label_turno.pack()
+
+        # Controles (jugar carta, modo ataque, terminar turno)
+        ctrl_frame = tk.Frame(parent, bg="#071025", relief=tk.RIDGE, bd=1)
+        ctrl_frame.pack(fill=tk.X, padx=12, pady=(6,12))
+
+        tk.Label(ctrl_frame, text="Controles", bg="#071025", fg="#cfe7ff", font=("Helvetica", 11, "bold")).pack(pady=(6,0))
+
+        self.btn_modo_atacar = tk.Button(ctrl_frame, text="Modo Ataque", command=self.modo_atacar, width=20)
+        self.btn_modo_atacar.pack(pady=6)
+
+        self.btn_cancelar = tk.Button(ctrl_frame, text="Cancelar", command=self.cancelar_accion, width=20)
+        self.btn_cancelar.pack(pady=6)
+
+        self.btn_terminar_turno = tk.Button(ctrl_frame, text="Terminar Turno", command=self.terminar_turno, width=20, bg="#27ae60", fg="white")
+        self.btn_terminar_turno.pack(pady=(8,12))
+
+        # Log de batalla
+        tk.Label(parent, text="Historial", bg="#071025", fg="#f6f6f6", font=("Helvetica", 11, "bold")).pack(pady=(2,6))
+        log_frame = tk.Frame(parent, bg="#071025", relief=tk.SUNKEN, bd=1)
+        log_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0,12))
+        self.log_text = scrolledtext.ScrolledText(log_frame, height=12, bg="#071025", fg="#e6f6f6", font=("Courier",9))
+        self.log_text.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
+
+    # ---------------------------
+    # Utilidades de imagen
+    # ---------------------------
+    def cargar_imagen_carta(self, carta, width=None, height=None, thumbnail=False):
+        """Carga imagen, cachea y devuelve PhotoImage.
+           Si carta no tiene imagen, crea placeholder con texto simple."""
+        if width is None: width = self.CARD_W
+        if height is None: height = self.CARD_H
+        key = f"{getattr(carta,'id', id(carta))}_{width}_{height}"
         if key in self.imagenes_cache:
             return self.imagenes_cache[key]
-        
+
         try:
-            img_path = carta.imagen_path
-            if os.path.exists(img_path):
+            img_path = getattr(carta, "imagen_path", None)
+            if img_path and os.path.exists(img_path):
                 img = Image.open(img_path)
-                img = img.resize((width, height), Image.Resampling.LANCZOS)
+                img = ImageOps.contain(img, (width, height))
                 photo = ImageTk.PhotoImage(img)
                 self.imagenes_cache[key] = photo
                 return photo
         except Exception as e:
-            print(f"Error cargando imagen: {e}")
-        
-        # Imagen por defecto
-        return self.crear_carta_placeholder(carta, width, height)
-    
-    def crear_carta_placeholder(self, carta, width, height):
-        """Crea una carta placeholder si no hay imagen"""
-        img = Image.new('RGB', (width, height), color='#8e44ad')
+            print("Error cargando imagen:", e)
+
+        # Placeholder simple: rectángulo con color
+        img = Image.new("RGBA", (width, height), "#2f4f6f")
         photo = ImageTk.PhotoImage(img)
+        self.imagenes_cache[key] = photo
         return photo
-    
-    def mostrar_carta(self, frame, carta, comando=None, seleccionable=True):
-        """Muestra una carta en el frame especificado"""
-        carta_frame = tk.Frame(frame, bg="#34495e", relief=tk.RAISED, bd=2)
-        carta_frame.pack(side=tk.LEFT, padx=3, pady=3)
-        
-        # Imagen
-        imagen = self.cargar_imagen_carta(carta, 80, 110)
-        label_img = tk.Label(carta_frame, image=imagen, bg="#34495e")
-        label_img.image = imagen  # Mantener referencia
-        label_img.pack()
-        
-        # Nombre
-        tk.Label(carta_frame, text=carta.nombre[:15], font=("Arial", 8),
-                bg="#34495e", fg="#ecf0f1", wraplength=80).pack()
-        
-        # Stats
-        stats_text = f"⚔️{carta.atk} 🛡️{carta.defensa}"
-        if hasattr(carta, 'posicion') and carta.posicion == "defensa":
-            stats_text += " [DEF]"
-        
-        tk.Label(carta_frame, text=stats_text, font=("Arial", 8, "bold"),
-                bg="#34495e", fg="#f39c12").pack()
-        
-        if seleccionable and comando:
-            carta_frame.bind("<Button-1>", lambda e: comando(carta))
-            label_img.bind("<Button-1>", lambda e: comando(carta))
-            carta_frame.config(cursor="hand2")
-    
+
+    def crear_mini_preview(self, carta):
+        return self.cargar_imagen_carta(carta, width=self.MINI_W, height=self.MINI_H)
+
+    # ---------------------------
+    # Redibujo de la interfaz
+    # ---------------------------
     def _limpiar_frame(self, frame):
-        """Elimina todos los widgets dentro de un frame"""
-        for widget in frame.winfo_children():
-            widget.destroy()
+        for w in frame.winfo_children():
+            w.destroy()
 
     def actualizar_interfaz(self):
-        """Actualiza toda la interfaz con el estado actual del juego"""
+        """Lee el estado del juego y actualiza toda la UI"""
         estado = self.juego.obtener_estado_juego()
-        
-        self._limpiar_frame(self.frame_mano)
-        self._limpiar_frame(self.frame_campo_jugador)
-        self._limpiar_frame(self.frame_campo_ia)
 
-        # Actualizar info IA
+        # Actualizar info básica
+        es_turno_jugador = estado.get("turno", "") == self.juego.jugador_humano.nombre
+        self.label_turno.config(text=("Tu Turno" if es_turno_jugador else "Turno IA"),
+                                bg=("#113344" if es_turno_jugador else "#441111"),
+                                fg="#ffffff")
+
+        # LP y counts
         self.label_ia_vida.config(text=f"LP: {estado['ia']['vida']}")
-        self.label_ia_deck.config(text=f"Deck: {estado['ia']['deck_size']}")
-        self.label_ia_mano.config(text=f"Mano: {estado['ia']['mano_size']}")
-        
-        # Actualizar info jugador
-        self.label_jugador_vida.config(text=f"LP: {estado['jugador']['vida']}")
-        self.label_jugador_deck.config(text=f"Deck: {estado['jugador']['deck_size']}")
-        
-        # Actualizar campo IA
-        for widget in self.frame_campo_ia.winfo_children():
-            widget.destroy()
-        
-        if estado['ia']['campo']:
-            for carta in estado['ia']['campo']:
-                self.mostrar_carta(self.frame_campo_ia, carta, 
-                                  comando=self.seleccionar_objetivo_ia,
-                                  seleccionable=(self.modo_seleccion == "atacar"))
-        else:
-            tk.Label(self.frame_campo_ia, text="Campo vacío",
-                    font=("Arial", 12), bg="#34495e", fg="#95a5a6").pack()
-        
-        # Actualizar campo jugador
-        for widget in self.frame_campo_jugador.winfo_children():
-            widget.destroy()
-        
-        if estado['jugador']['campo']:
-            for carta in estado['jugador']['campo']:
-                self.mostrar_carta(self.frame_campo_jugador, carta,
-                                  comando=self.seleccionar_carta_campo)
-        else:
-            tk.Label(self.frame_campo_jugador, text="Campo vacío",
-                    font=("Arial", 12), bg="#34495e", fg="#95a5a6").pack()
-        
-        # Actualizar mano
-        for widget in self.frame_mano.winfo_children():
-            widget.destroy()
-        
-        for carta in estado['jugador']['mano']:
-            self.mostrar_carta(self.frame_mano, carta,
-                              comando=self.seleccionar_carta_mano)
-        
-        # Actualizar log
+        self.label_ia_deckcount.config(text=f"Deck: {estado['ia']['deck_size']}")
+
+        self.label_player_vida.config(text=f"LP: {estado['jugador']['vida']}")
+        self.label_player_deckcount.config(text=f"Deck: {estado['jugador']['deck_size']}")
+
+        # --- AQUI SE ELIMINÓ LA ACTUALIZACIÓN DE PREVIEWS Y CEMENTERIOS ---
+
+        # Actualizar campos: limpiar
+        for slot in self.slots_ia:
+            for w in slot.winfo_children(): w.destroy()
+            tk.Label(slot, text="Vacío", bg=slot.cget("bg"), fg="#9aa3b2").pack(expand=True)
+        for slot in self.slots_player:
+            for w in slot.winfo_children(): w.destroy()
+            tk.Label(slot, text="Vacío", bg=slot.cget("bg"), fg="#9aa3b2").pack(expand=True)
+
+        # Colocar cartas en campo si existen
+        campo_ia = estado['ia'].get('campo', [])
+        campo_player = estado['jugador'].get('campo', [])
+
+        # Rellenar IA slots (OBJETIVOS)
+        for idx, carta in enumerate(campo_ia[:self.SLOT_COUNT]):
+            slot = self.slots_ia[idx]
+            for w in slot.winfo_children(): w.destroy()
+            # mostrar imagen pequeña + stats
+            img = self.cargar_imagen_carta(carta, width=90, height=120)
+            lbl = tk.Label(slot, image=img, bg=slot.cget("bg"))
+            lbl.image = img
+            lbl.pack()
+            tk.Label(slot, text=carta.nombre[:12], bg=slot.cget("bg"), fg="#f6f6f6", font=("Helvetica",8)).pack()
+            tk.Label(slot, text=f"ATK:{carta.atk} DEF:{carta.defensa}", bg=slot.cget("bg"), fg="#f0d8a8", font=("Helvetica",8)).pack()
+
+            # Lógica de selección con propagación a hijos
+            if self.modo_seleccion == "atacar":
+                def _make_target_handler(c=carta):
+                    return lambda e: self.seleccionar_objetivo_ia(c)
+                handler = _make_target_handler()
+                
+                slot.bind("<Button-1>", handler)
+                slot.config(cursor="hand2")
+                # Bindear también a los hijos (labels/imagen)
+                for child in slot.winfo_children():
+                    child.bind("<Button-1>", handler)
+                    child.config(cursor="hand2")
+            else:
+                slot.unbind("<Button-1>")
+                slot.config(cursor="")
+                for child in slot.winfo_children():
+                    child.unbind("<Button-1>")
+                    child.config(cursor="")
+
+        # Rellenar Jugador slots (ATACANTES)
+        for idx, carta in enumerate(campo_player[:self.SLOT_COUNT]):
+            slot = self.slots_player[idx]
+            for w in slot.winfo_children(): w.destroy()
+            img = self.cargar_imagen_carta(carta, width=90, height=120)
+            lbl = tk.Label(slot, image=img, bg=slot.cget("bg"))
+            lbl.image = img
+            lbl.pack()
+            tk.Label(slot, text=carta.nombre[:12], bg=slot.cget("bg"), fg="#cfe7ff", font=("Helvetica",8)).pack()
+            tk.Label(slot, text=f"ATK:{carta.atk} DEF:{carta.defensa}", bg=slot.cget("bg"), fg="#d0f0d0", font=("Helvetica",8)).pack()
+
+            # permitir seleccionar carta atacante si estamos en modo atacar
+            if self.modo_seleccion == "atacar":
+                def _make_attacker_handler(c=carta):
+                    return lambda e: self.seleccionar_carta_campo(c)
+                handler = _make_attacker_handler()
+
+                slot.bind("<Button-1>", handler)
+                slot.config(cursor="hand2")
+                # Bindear también a los hijos
+                for child in slot.winfo_children():
+                    child.bind("<Button-1>", handler)
+                    child.config(cursor="hand2")
+            else:
+                slot.unbind("<Button-1>")
+                slot.config(cursor="")
+                for child in slot.winfo_children():
+                    child.unbind("<Button-1>")
+                    child.config(cursor="")
+
+        # Mano del jugador: limpiar y mostrar todas las cartas
+        for w in self.frame_mano.winfo_children(): w.destroy()
+        mano = estado['jugador'].get('mano', [])
+        for carta in mano:
+            cont = tk.Frame(self.frame_mano, bg="#071025", bd=0, padx=6)
+            cont.pack(side=tk.LEFT, padx=6, pady=6)
+            img = self.cargar_imagen_carta(carta, width=110, height=150)
+            lbl = tk.Label(cont, image=img, bg="#071025")
+            lbl.image = img
+            lbl.pack()
+            tk.Label(cont, text=carta.nombre[:18], bg="#071025", fg="#cfe7ff", font=("Helvetica",8)).pack()
+            
+            # bind click
+            def _hand_handler(e, c=carta):
+                self.seleccionar_carta_mano(c)
+            
+            cont.bind("<Button-1>", _hand_handler)
+            lbl.bind("<Button-1>", _hand_handler)
+            for child in cont.winfo_children():
+                 child.bind("<Button-1>", _hand_handler)
+            cont.config(cursor="hand2")
+
+        # Log
         self.log_text.delete(1.0, tk.END)
-        for linea in estado['historial']:
+        for linea in estado.get('historial', []):
             self.log_text.insert(tk.END, linea + "\n")
-        self.log_text.see(tk.END)
-        
-        # Actualizar indicador de turno
-        es_turno_jugador = estado['turno'] == "Jugador"
-        self.label_turno.config(
-            text="Tu Turno" if es_turno_jugador else "Turno IA",
-            bg="#3498db" if es_turno_jugador else "#e74c3c"
-        )
-        
-        # Verificar ganador
-        if estado['ganador']:
+        self.log_text.see("end")
+
+        # actualizar label central si hay ganador
+        if estado.get("ganador"):
             self.mostrar_ganador(estado['ganador'])
-    
+
+    # ---------------------------
+    # Acciones del jugador (interfaz -> juego)
+    # ---------------------------
     def seleccionar_carta_mano(self, carta):
-        """Maneja la selección de una carta de la mano"""
+        """Preguntar si invocar esta carta (ataque por default)"""
         if self.juego.turno_actual != self.juego.jugador_humano:
             messagebox.showwarning("Advertencia", "No es tu turno")
             return
-        
-        if self.modo_seleccion == "fusionar":
-            if not self.carta_fusion_1:
-                self.carta_fusion_1 = carta
-                messagebox.showinfo("Fusión", f"Primera carta: {carta.nombre}\nSelecciona la segunda carta")
-            else:
-                # Intentar fusión
-                exito, resultado = self.juego.fusionar_cartas(self.carta_fusion_1, carta)
-                if exito:
-                    messagebox.showinfo("¡Fusión exitosa!", 
-                                       f"Obtuviste: {resultado.nombre}\nATK: {resultado.atk} DEF: {resultado.defensa}")
-                else:
-                    messagebox.showerror("Error", "Estas cartas no pueden fusionarse")
-                
-                self.cancelar_accion()
+        # Solo mostrar dialogo sencillo
+        respuesta = messagebox.askyesno("Invocar carta", f"Invocar {carta.nombre}?\nATK: {carta.atk}  DEF: {carta.defensa}")
+        if respuesta:
+            exito, msg = self.juego.jugar_carta_humano(carta, "ataque")
+            if not exito:
+                messagebox.showerror("Error", msg)
+            # actualizar interfaz
+            try:
                 self.actualizar_interfaz()
-        else:
-            # Jugar carta normalmente
-            self.carta_seleccionada = carta
-            respuesta = messagebox.askyesno("Invocar carta",
-                                           f"¿Invocar {carta.nombre}?\nATK: {carta.atk} DEF: {carta.defensa}")
-            if respuesta:
-                exito, msg = self.juego.jugar_carta_humano(carta, "ataque")
-                if exito:
-                    self.actualizar_interfaz()
-                else:
-                    messagebox.showerror("Error", msg)
-    
-    def seleccionar_carta_campo(self, carta):
-        """Maneja la selección de una carta del campo"""
-        if self.modo_seleccion == "atacar":
-            self.carta_seleccionada = carta
-            # Pequeña confirmación visual en consola o título
-            print(f"Atacante seleccionado: {carta.nombre}")
-            messagebox.showinfo("Ataque", f"Atacante: {carta.nombre}\n\n¡Ahora haz CLIC en la carta enemiga que quieres destruir!")
+            except Exception:
+                pass
 
-    def seleccionar_objetivo_ia(self, carta_objetivo):
-        """Maneja el ataque a una carta de la IA"""
+    def seleccionar_carta_campo(self, carta):
+        """Selecciona carta atacante (modo atacar)"""
+        if self.modo_seleccion != "atacar":
+            return
+        if not carta:
+            return
+        self.carta_seleccionada = carta
+        messagebox.showinfo("Atacar", f"Seleccionado atacante: {carta.nombre}\nAhora clic en la carta enemiga objetivo.")
+        # la selección del objetivo (en slots_ia) invocará seleccionar_objetivo_ia
+
+    def seleccionar_objetivo_ia(self, objetivo):
+        """Atacar carta del objetivo con la carta seleccionada"""
         if not self.carta_seleccionada:
             messagebox.showwarning("Advertencia", "Primero selecciona tu carta atacante")
             return
-        
-        exito, msg = self.juego.atacar_carta_humano(self.carta_seleccionada, carta_objetivo)
-        if exito:
-            self.cancelar_accion()
-            self.actualizar_interfaz()
-        else:
+        exito, msg = self.juego.atacar_carta_humano(self.carta_seleccionada, objetivo)
+        if not exito:
             messagebox.showerror("Error", msg)
-    
+        # resetear modo
+        self.cancelar_accion()
+        try:
+            self.actualizar_interfaz()
+        except Exception:
+            pass
+
     def modo_atacar(self):
-        """Activa el modo de ataque"""
+        """Activa modo atacar (el usuario luego click en su carta y luego en objetivo)"""
         if not self.juego.jugador_humano.tiene_cartas_campo():
             messagebox.showwarning("Advertencia", "No tienes cartas en el campo")
             return
-        
         self.modo_seleccion = "atacar"
-        
-        # --- AGREGAR ESTA LÍNEA ---
-        # Esto redibuja las cartas enemigas, ahora con la propiedad "seleccionable=True"
-        self.actualizar_interfaz() 
-        # --------------------------
-        
-        messagebox.showinfo("Modo Ataque", "1. Selecciona TU carta atacante.\n2. Luego selecciona la carta ENEMIGA objetivo.")
-    
-    def iniciar_fusion(self):
-        """Inicia el proceso de fusión"""
-        if len(self.juego.jugador_humano.mano) < 2:
-            messagebox.showwarning("Advertencia", "Necesitas al menos 2 cartas en la mano")
-            return
-        
-        self.modo_seleccion = "fusionar"
-        self.carta_fusion_1 = None
-        messagebox.showinfo("Fusión", "Selecciona 2 cartas de tu mano para fusionar")
-    
+        self.carta_seleccionada = None
+        messagebox.showinfo("Modo Ataque", "Selecciona tu carta atacante (click sobre la carta en tu campo), luego selecciona la carta enemiga objetivo.")
+        # redibujar interfaz para activar bindings
+        try:
+            self.actualizar_interfaz()
+        except Exception:
+            pass
+
     def cancelar_accion(self):
-        """Cancela la acción actual"""
         self.modo_seleccion = None
         self.carta_seleccionada = None
-        self.carta_fusion_1 = None
-        
-        # --- AGREGAR ESTA LÍNEA ---
-        # Restaura la interfaz al estado normal
-        self.actualizar_interfaz()
-        # --------------------------
-    
+        try:
+            self.actualizar_interfaz()
+        except Exception:
+            pass
+
     def terminar_turno(self):
-        """Termina el turno del jugador"""
+        """Terminar turno: delega en Juego.cambiar_turno (la IA responderá)"""
         if self.juego.turno_actual != self.juego.jugador_humano:
             messagebox.showwarning("Advertencia", "No es tu turno")
             return
-        
         self.cancelar_accion()
+        # Llamada al juego para cambiar turno; el juego llamará al callback on_actualizar_interfaz
         self.juego.cambiar_turno()
-        self.actualizar_interfaz()
-    
+        try:
+            self.actualizar_interfaz()
+        except Exception:
+            pass
+
+    # ---------------------------
+    # Configuración e integración
+    # ---------------------------
+    def _abrir_config_deck(self):
+        """Pide al usuario el tamaño del deck antes de iniciar/reiniciar"""
+        current = getattr(self.juego, "tamanio_deck", 20)
+        val = simpledialog.askinteger("Config Deck", "Tamaño del deck por jugador (5-40):", initialvalue=current, minvalue=5, maxvalue=40)
+        if val:
+            # setear y reiniciar
+            self.juego.tamanio_deck = min(max(5, val), 40)
+            self._reiniciar_desde_interfaz()
+
+    def _reiniciar_desde_interfaz(self):
+        """Reinicia el juego usando la configuración actual del objeto Juego"""
+        self.juego.inicializar_juego()
+        try:
+            self.actualizar_interfaz()
+        except Exception:
+            pass
+
+    # ---------------------------
+    # Mensajes finales
+    # ---------------------------
     def mostrar_ganador(self, ganador):
-        """Muestra el mensaje de ganador"""
-        mensaje = f"🎉 ¡{ganador} ha ganado la partida!"
-        resultado = messagebox.askyesno("Fin del juego", 
-                                        mensaje + "\n\n¿Jugar de nuevo?")
-        if resultado:
-            self.reiniciar_juego()
+        """Muestra el diálogo de fin de juego y maneja reinicio"""
+        nombre = ganador if isinstance(ganador, str) else getattr(ganador, "nombre", str(ganador))
+        
+        # IMPORTANTE: Resetear el ganador ANTES de mostrar el diálogo
+        # para evitar que actualizar_interfaz lo detecte de nuevo
+        self.juego.ganador = None
+        
+        respuesta = messagebox.askyesno("Fin del juego", f"🎉 {nombre} ha ganado la partida!\n¿Jugar de nuevo?")
+        
+        if respuesta:
+            self._reiniciar_desde_interfaz()
         else:
             self.root.quit()
-    
-    def reiniciar_juego(self):
-        """Reinicia el juego"""
+
+    def _reiniciar_desde_interfaz(self):
+        """Reinicia el juego usando la configuración actual del objeto Juego"""
+        # Resetear estado de la interfaz
+        self.carta_seleccionada = None
+        self.modo_seleccion = None
+        
+        # Reiniciar el juego (esto limpia historial, crea nuevos decks, etc)
         self.juego.inicializar_juego()
-        self.cancelar_accion()
-        self.actualizar_interfaz()
+        
+        # Actualizar interfaz con el nuevo estado
+        try:
+            self.actualizar_interfaz()
+        except Exception as e:
+            print(f"Error actualizando interfaz: {e}")

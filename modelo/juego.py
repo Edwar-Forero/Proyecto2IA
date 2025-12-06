@@ -31,6 +31,12 @@ class Juego:
     
     def inicializar_juego(self):
         """Prepara el juego con decks aleatorios"""
+        # IMPORTANTE: Resetear el ganador al inicio
+        self.ganador = None
+        
+        # Limpiar historial previo
+        self.historial = []
+        
         # Crear decks aleatorios
         deck_completo = self.cartas_disponibles.copy()
         random.shuffle(deck_completo)
