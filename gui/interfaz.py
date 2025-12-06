@@ -377,7 +377,7 @@ class InterfazYuGiOh:
         if not carta:
             return
         self.carta_seleccionada = carta
-        messagebox.showinfo("Atacar", f"Seleccionado atacante: {carta.nombre}\nAhora clic en la carta enemiga objetivo.")
+        # messagebox.showinfo("Atacar", f"Seleccionado atacante: {carta.nombre}\nAhora clic en la carta enemiga objetivo.")
         # la selección del objetivo (en slots_ia) invocará seleccionar_objetivo_ia
 
     def seleccionar_objetivo_ia(self, objetivo):
@@ -402,7 +402,7 @@ class InterfazYuGiOh:
             return
         self.modo_seleccion = "atacar"
         self.carta_seleccionada = None
-        messagebox.showinfo("Modo Ataque", "Selecciona tu carta atacante (click sobre la carta en tu campo), luego selecciona la carta enemiga objetivo.")
+        # messagebox.showinfo("Modo Ataque", "Selecciona tu carta atacante (click sobre la carta en tu campo), luego selecciona la carta enemiga objetivo.")
         # redibujar interfaz para activar bindings
         try:
             self.actualizar_interfaz()
