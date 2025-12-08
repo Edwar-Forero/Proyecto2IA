@@ -304,7 +304,6 @@ class Juego:
                 "mano": self.jugador_humano.mano,
                 "campo": self.jugador_humano.campo,
                 "deck_size": len(self.jugador_humano.deck),
-                "cementerio": len(self.jugador_humano.cementerio)
             },
             "ia": {
                 "nombre": self.jugador_ia.nombre,
@@ -312,10 +311,9 @@ class Juego:
                 "mano_size": len(self.jugador_ia.mano),
                 "campo": self.jugador_ia.campo,
                 "deck_size": len(self.jugador_ia.deck),
-                "cementerio": len(self.jugador_ia.cementerio)
             },
             "turno": self.turno_actual.nombre,
             "fase": self.fase,
-            "historial": self.historial[-10:],  # Últimos 10 mensajes
+            "historial": self.historial[-100:],  # Últimos 100 mensajes
             "ganador": self.ganador.nombre if self.ganador else None
         }

@@ -634,7 +634,7 @@ class InterfazYuGiOh:
         
         self.juego.ganador = None
         
-        respuesta = messagebox.askyesno("Fin del juego", f"🎉 {nombre} ha ganado la partida!\n¿Jugar de nuevo?")
+        respuesta = messagebox.askyesno("Fin del juego", f" {nombre} ha ganado la partida!\n¿Jugar de nuevo?")
         
         if respuesta:
             self._reiniciar_desde_interfaz()
