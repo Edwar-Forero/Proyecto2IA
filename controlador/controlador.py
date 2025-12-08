@@ -3,22 +3,12 @@ from modelo.carta import Carta
 from modelo.juego import Juego
 
 class Controlador:
-    """Controlador principal que conecta la lógica con la interfaz"""
-    
+
     def __init__(self):
         self.cartas = []
         self.juego = None
     
-    def cargar_cartas_desde_json(self, ruta_json="datos/cartas.json"):
-        """
-        Carga las cartas desde el archivo JSON.
-        
-        Args:
-            ruta_json: Ruta al archivo cartas.json
-        
-        Returns:
-            Lista de objetos Carta
-        """
+    def cargar_cartas_desde_json(self, ruta_json="datos/normales.json"):
         try:
             with open(ruta_json, 'r', encoding='utf-8') as f:
                 datos = json.load(f)
@@ -66,15 +56,6 @@ class Controlador:
             return []
     
     def inicializar_juego(self, tamanio_deck=20):
-        """
-        Inicializa un nuevo juego.
-        
-        Args:
-            tamanio_deck: Número de cartas por deck (máximo 40)
-        
-        Returns:
-            Objeto Juego inicializado
-        """
         if not self.cartas:
             print(" Advertencia: No hay cartas cargadas. Cargando...")
             self.cargar_cartas_desde_json()
@@ -86,11 +67,10 @@ class Controlador:
         self.juego = Juego(self.cartas, tamanio_deck)
         self.juego.inicializar_juego()
         
-        print(f"🎮 Juego inicializado con decks de {tamanio_deck} cartas")
+        print(f"Juego inicializado con decks de {tamanio_deck} cartas")
         return self.juego
     
     def obtener_estadisticas_cartas(self):
-        """Muestra estadísticas de las cartas cargadas"""
         if not self.cartas:
             return "No hay cartas cargadas"
         
@@ -113,13 +93,11 @@ class Controlador:
         return stats
     
     def obtener_cartas_mas_fuertes(self, cantidad=10):
-        """Retorna las cartas más fuertes por ATK"""
         if not self.cartas:
             return []
         
         return sorted(self.cartas, key=lambda c: c.atk, reverse=True)[:cantidad]
     
     def buscar_carta_por_nombre(self, nombre):
-        """Busca una carta por nombre"""
         nombre_lower = nombre.lower()
         return [c for c in self.cartas if nombre_lower in c.nombre.lower()]

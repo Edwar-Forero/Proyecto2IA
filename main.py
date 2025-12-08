@@ -12,15 +12,15 @@ def main():
     print("=" * 60)
     
     # Inicializar descargador de cartas
-    downloader = YGOCardDownloader(cantidad=80)
+    downloader = YGOCardDownloader(cantidad_normales=100, cantidad_fusiones=50)
     
     # Obtener o descargar cartas
     print("\n Verificando base de datos de cartas...")
-    cartas_json = downloader.obtener_cartas()
+    cartas_json = downloader.generar_sets()
     print(f" {len(cartas_json)} cartas disponibles en el sistema")
     
     # Inicializar controlador
-    print("\n🎮 Inicializando controlador del juego...")
+    print("\n Inicializando controlador del juego...")
     controlador = Controlador()
     
     # Cargar cartas desde JSON
@@ -60,7 +60,7 @@ def main():
     juego = controlador.inicializar_juego(tamanio_deck)
     
     # Crear interfaz gráfica
-    print("🖥️  Cargando interfaz gráfica...")
+    print(" Cargando interfaz gráfica...")
     app = InterfazYuGiOh(root, juego)
     
     # Mensaje de bienvenida

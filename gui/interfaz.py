@@ -25,7 +25,7 @@ class InterfazYuGiOh:
         self.root = root
         self.juego = juego
         self.root.title("Yu-Gi-Oh! - Minimax (Jugador vs IA)")
-        self.root.geometry("1200x900")
+        self.root.geometry("1200x1080")
         self.root.configure(bg="#0b1220")
 
         # Variables de selección
@@ -39,7 +39,11 @@ class InterfazYuGiOh:
         self.juego.on_actualizar_interfaz = self.actualizar_interfaz
 
         # Crear layout completo
-        self._crear_layout()
+        self._crear_contenedor_scroll()
+
+        # Crear layout dentro del contenedor scrolleable
+        self._crear_layout(self.scroll_frame)
+
         
         # Intentar actualizar vista inicial
         try:
@@ -47,9 +51,57 @@ class InterfazYuGiOh:
         except Exception:
             pass
 
-    def _crear_layout(self):
+    
+    def _crear_contenedor_scroll(self):
+        """Crea un contenedor principal con scroll vertical para TODA la interfaz."""
+
+        # Canvas para mover toda la interfaz
+        self.root_canvas = tk.Canvas(
+            self.root,
+            bg="#0b1220",
+            highlightthickness=0
+        )
+        self.root_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Scrollbar vertical
+        self.scrollbar_y = tk.Scrollbar(
+            self.root,
+            orient="vertical",
+            command=self.root_canvas.yview
+        )
+        self.scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Conectar canvas <-> scrollbar
+        self.root_canvas.configure(yscrollcommand=self.scrollbar_y.set)
+
+        # Frame interior donde va TODO el contenido real
+        self.scroll_frame = tk.Frame(self.root_canvas, bg="#0b1220")
+
+        # Insertar el frame dentro del canvas
+        self.root_canvas.create_window(
+            (0, 0),
+            window=self.scroll_frame,
+            anchor="nw"
+        )
+
+        # Actualizar región del scroll cuando cambie el contenido
+        def update_scroll_region(event):
+            self.root_canvas.configure(scrollregion=self.root_canvas.bbox("all"))
+
+        
+        self.scroll_frame.bind("<Configure>", update_scroll_region)
+
+        # Activar scroll con rueda del mouse
+        def on_mousewheel(event):
+            self.root_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        self.root.bind_all("<MouseWheel>", on_mousewheel)
+
+
+
+    def _crear_layout(self, parent):
         # Top bar: título + configuración
-        topbar = tk.Frame(self.root, bg="#071025", height=48)
+        topbar = tk.Frame(parent, bg="#071025", height=48)
         topbar.pack(side=tk.TOP, fill=tk.X)
         topbar.pack_propagate(False)
         tk.Label(topbar, text="Yu-Gi-Oh: Minimax Duel", font=("Helvetica", 16, "bold"),
@@ -58,8 +110,9 @@ class InterfazYuGiOh:
         tk.Button(topbar, text="Reiniciar Juego", command=self._reiniciar_desde_interfaz).pack(side=tk.LEFT, padx=8)
 
         # Main area: center board / right controls
-        main = tk.Frame(self.root, bg="#081426")
-        main.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=8, pady=8)
+        main = tk.Frame(parent, bg="#081426")
+        main.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=(8,0), pady=8)
+
 
         # Center panel: Board (IA arriba, jugador abajo)
         center = tk.Frame(main, bg="#0b1220")
@@ -69,7 +122,7 @@ class InterfazYuGiOh:
 
         # Right panel: controles y log
         right = tk.Frame(main, bg="#071025", width=340)
-        right.pack(side=tk.RIGHT, fill=tk.Y, padx=(8,0))
+        right.pack(side=tk.RIGHT, fill=tk.Y, padx=(0,0), anchor="ne")
         right.pack_propagate(False)
         self._crear_panel_derecho(right)
 
@@ -131,7 +184,7 @@ class InterfazYuGiOh:
         self.label_player_deckcount.pack(side=tk.LEFT, padx=6)
 
         # Mano con canvas horizontal
-        mano_container = tk.Frame(parent, bg="#071025", height=170)
+        mano_container = tk.Frame(parent, bg="#071025", height=230)
         mano_container.pack(side=tk.TOP, fill=tk.X, pady=(10,4))
         mano_container.pack_propagate(False)
 
@@ -153,37 +206,66 @@ class InterfazYuGiOh:
     def _crear_panel_derecho(self, parent):
         # Indicador de turno
         turn_frame = tk.Frame(parent, bg="#071025")
-        turn_frame.pack(fill=tk.X, pady=(12,8), padx=12)
-        self.label_turno = tk.Label(turn_frame, text="Turno: -", bg="#071025", fg="#fff", font=("Helvetica", 13, "bold"))
-        self.label_turno.pack()
+        turn_frame.pack(side=tk.TOP, anchor="e", pady=(12,8), padx=(0,8))
+        self.label_turno = tk.Label(
+            turn_frame, text="Turno: -", bg="#071025", fg="#fff",
+            font=("Helvetica", 13, "bold")
+        )
+        self.label_turno.pack(anchor="e")  # alineado a la derecha
 
         # Label de estado
-        self.label_estado = tk.Label(turn_frame, text="", bg="#071025", fg="#ffcc00", font=("Helvetica", 10))
-        self.label_estado.pack(pady=(6,0))
+        self.label_estado = tk.Label(
+            turn_frame, text="", bg="#071025", fg="#ffcc00",
+            font=("Helvetica", 10)
+        )
+        self.label_estado.pack(pady=(6,0), anchor="e")  # derecha
 
         # Controles
         ctrl_frame = tk.Frame(parent, bg="#071025", relief=tk.RIDGE, bd=1)
-        ctrl_frame.pack(fill=tk.X, padx=12, pady=(6,12))
+        ctrl_frame.pack(side=tk.TOP, anchor="e", padx=(0,8), pady=(6,12))
 
-        tk.Label(ctrl_frame, text="Controles", bg="#071025", fg="#cfe7ff", font=("Helvetica", 11, "bold")).pack(pady=(6,0))
+        tk.Label(
+            ctrl_frame, text="Controles", bg="#071025", fg="#cfe7ff",
+            font=("Helvetica", 11, "bold")
+        ).pack(pady=(6,0), anchor="e")  # derecha
 
-        self.btn_modo_atacar = tk.Button(ctrl_frame, text="Modo Ataque", command=self.modo_atacar, width=20)
-        self.btn_modo_atacar.pack(pady=6)
+        self.btn_modo_atacar = tk.Button(
+            ctrl_frame, text="Modo Ataque", command=self.modo_atacar, width=20
+        )
+        self.btn_modo_atacar.pack(pady=6, anchor="e")
 
-        self.btn_cambiar_posicion = tk.Button(ctrl_frame, text="Cambiar Posición", command=self.modo_cambiar_posicion, width=20)
-        self.btn_cambiar_posicion.pack(pady=6)
+        self.btn_cambiar_posicion = tk.Button(
+            ctrl_frame, text="Cambiar Posición",
+            command=self.modo_cambiar_posicion, width=20
+        )
+        self.btn_cambiar_posicion.pack(pady=6, anchor="e")
 
-        self.btn_cancelar = tk.Button(ctrl_frame, text="Cancelar", command=self.cancelar_accion, width=20, state=tk.DISABLED)
-        self.btn_cancelar.pack(pady=6)
+        self.btn_cancelar = tk.Button(
+            ctrl_frame, text="Cancelar", command=self.cancelar_accion,
+            width=20, state=tk.DISABLED
+        )
+        self.btn_cancelar.pack(pady=6, anchor="e")
 
-        self.btn_terminar_turno = tk.Button(ctrl_frame, text="Terminar Turno", command=self.terminar_turno, width=20, bg="#27ae60", fg="white")
-        self.btn_terminar_turno.pack(pady=(8,12))
+        self.btn_terminar_turno = tk.Button(
+            ctrl_frame, text="Terminar Turno",
+            command=self.terminar_turno, width=20,
+            bg="#27ae60", fg="white"
+        )
+        self.btn_terminar_turno.pack(pady=(8,12), anchor="e")
 
         # Log de batalla
-        tk.Label(parent, text="Historial", bg="#071025", fg="#f6f6f6", font=("Helvetica", 11, "bold")).pack(pady=(2,6))
+        tk.Label(
+            parent, text="Historial", bg="#071025", fg="#f6f6f6",
+            font=("Helvetica", 11, "bold")
+        ).pack(side=tk.TOP, anchor="e", pady=(2,6), padx=(0,8))  # derecha
+
         log_frame = tk.Frame(parent, bg="#071025", relief=tk.SUNKEN, bd=1)
-        log_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0,12))
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=12, bg="#071025", fg="#e6f6f6", font=("Courier",9))
+        log_frame.pack(side=tk.TOP, anchor="e", padx=(0,8), pady=(0,12))
+
+        self.log_text = scrolledtext.ScrolledText(
+            log_frame, height=12, bg="#071025", fg="#e6f6f6",
+            font=("Courier", 9)
+        )
         self.log_text.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
 
     def cargar_imagen_carta(self, carta, width=None, height=None, thumbnail=False):
