@@ -4,116 +4,146 @@ import json
 
 class YGOCardDownloader:
     BASE_URL = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
-    CACHE_JSON = "datos/cartas.json"
+
+    CACHE_NORMALES = "datos/normales.json"
+    CACHE_FUSIONES = "datos/fusiones.json"
+
     IMG_DIR = "datos/imagenes/"
 
-    def __init__(self, cantidad=100):
-        self.cantidad = cantidad
+    NORMAL_TYPES = [
+        "Normal Monster",
+        "Effect Monster",
+        "Pendulum Effect Monster",
+        "Pendulum Normal Monster",
+        "Ritual Monster"
+    ]
+
+    FUSION_TYPES = ["Fusion Monster"]
+
+    def __init__(self, cantidad_normales=80, cantidad_fusiones=30):
+        self.cantidad_normales = cantidad_normales
+        self.cantidad_fusiones = cantidad_fusiones
         self._asegurar_directorios()
 
+    # DIRECTORIOS
     def _asegurar_directorios(self):
         if not os.path.exists("datos"):
             os.makedirs("datos")
         if not os.path.exists(self.IMG_DIR):
             os.makedirs(self.IMG_DIR)
 
-    # Cargar cartas desde cache si existe
-    def cargar_desde_cache(self):
-        if os.path.exists(self.CACHE_JSON):
-            print("Cargando cartas desde cache local...")
-            with open(self.CACHE_JSON, "r", encoding="utf-8") as f:
-                return json.load(f)
-        return None
-
-    # Llamar a la API para obtener todas las cartas
+    # DESCARGA COMPLETA DE API
     def descargar_cartas(self):
-        print("Descargando TODAS las cartas desde YGOPRODeck...")
+        print("Descargando cartas desde la API YGOPRODeck...")
 
         response = requests.get(self.BASE_URL)
         response.raise_for_status()
 
         data = response.json().get("data", [])
+        print(f"Total de cartas recibidas: {len(data)}")
 
-        print(f"Total cartas recibidas: {len(data)}")
         return data
 
-
-    # Filtrar 100 cartas 
-    def filtrar_cartas_validas(self, data):
-        print("Filtrando solo monstruos válidos para el juego...")
-
-        monstruos = []
+    # FILTRO DE CARTAS NORMALES
+    def filtrar_normales(self, data):
+        normales = []
 
         for c in data:
             tipo = c.get("type", "")
-            
-            # Filtramos SOLO monstruos normales o de efecto
-            if tipo not in [
-                "Normal Monster",
-                "Effect Monster",
-                "Pendulum Effect Monster",
-                "Pendulum Normal Monster",
-                "Ritual Monster",
-                "Fusion Monster"
-            ]:
+
+            # Solo monstruos NO FUSIÓN
+            if tipo not in self.NORMAL_TYPES:
                 continue
 
-            # Validaciones adicionales
+            # Validaciones extra
             if (
-                c.get("atk") is None or 
-                c.get("def") is None or     # Evita Link Monsters (no tienen DEF)
-                c.get("level") is None or   # Evita Xyz/Synchro
+                c.get("atk") is None or
+                c.get("def") is None or
+                c.get("level") is None or
                 "card_images" not in c
             ):
                 continue
 
-            monstruos.append(c)
+            normales.append(c)
 
-        print(f"✔ Monstruos filtrados: {len(monstruos)}")
+        print(f"Normales encontradas: {len(normales)}")
 
-        
-        # Ordena por atributo y raza para evitar cartas repetidas o muy similares
-        monstruos.sort(key=lambda x: (x["attribute"], x["race"]))
+        normales.sort(key=lambda x: (x["attribute"], x["race"]))
 
-        # Selecciona solo la cantidad especificada
-        seleccionados = monstruos[:self.cantidad]
+        return normales[:self.cantidad_normales]
 
-        print(f"Selección final: {len(seleccionados)} cartas")
-        return seleccionados
+    # FILTRO DE CARTAS DE FUSIÓN
+    def filtrar_fusiones(self, data):
+        fusiones = []
 
+        for c in data:
+            tipo = c.get("type", "")
 
-    # Guardar imágenes localmente
+            if tipo not in self.FUSION_TYPES:
+                continue
+
+            # Validaciones extra
+            if (
+                c.get("atk") is None or
+                c.get("def") is None or
+                c.get("level") is None or
+                "card_images" not in c
+            ):
+                continue
+
+            fusiones.append(c)
+
+        print(f"Fusiones encontradas: {len(fusiones)}")
+
+        fusiones.sort(key=lambda x: (x["attribute"], x["race"]))
+
+        return fusiones[:self.cantidad_fusiones]
+
+    # DESCARGAR IMÁGENES LOCALMENTE
     def descargar_imagenes(self, cartas):
         print("Descargando imágenes...")
 
         for c in cartas:
-            id = c["id"]
+            card_id = c["id"]
             img_url = c["card_images"][0]["image_url"]
-            img_path = f"{self.IMG_DIR}/{id}.jpg"
+            img_path = f"{self.IMG_DIR}/{card_id}.jpg"
 
             if not os.path.exists(img_path):
-                img = requests.get(img_url)
-                with open(img_path, "wb") as f:
-                    f.write(img.content)
+                try:
+                    img = requests.get(img_url)
+                    with open(img_path, "wb") as f:
+                        f.write(img.content)
+                except Exception as e:
+                    print(f"ERROR descargando imagen {card_id}: {e}")
 
-        print("Imágenes guardadas en datos/imagenes/")
+        print("Imágenes guardadas.")
 
-    #Guardar JSON final
-    def guardar_cache(self, cartas):
-        with open(self.CACHE_JSON, "w", encoding="utf-8") as f:
-            json.dump(cartas, f, ensure_ascii=False, indent=4)
+    # GUARDAR JSON
+    def guardar_json(self, normales, fusiones):
+        with open(self.CACHE_NORMALES, "w", encoding="utf-8") as f:
+            json.dump(normales, f, ensure_ascii=False, indent=4)
 
-        print(f"Cartas guardadas en {self.CACHE_JSON}")
+        with open(self.CACHE_FUSIONES, "w", encoding="utf-8") as f:
+            json.dump(fusiones, f, ensure_ascii=False, indent=4)
 
+        print("normales.json y fusiones.json guardados correctamente.")
 
-    # Método principal para obtener cartas       
-    def obtener_cartas(self):
-        cache = self.cargar_desde_cache()
-        if cache is not None:
-            return cache
+    # MÉTODO PRINCIPAL
+    def generar_sets(self):
+        print("Generando sets de cartas...")
 
         data = self.descargar_cartas()
-        filtradas = self.filtrar_cartas_validas(data)
-        self.descargar_imagenes(filtradas)
-        self.guardar_cache(filtradas)
-        return filtradas
+
+        normales = self.filtrar_normales(data)
+        fusiones = self.filtrar_fusiones(data)
+
+        # Descargar imágenes
+        self.descargar_imagenes(normales)
+        self.descargar_imagenes(fusiones)
+
+        # Guardar doble JSON
+        self.guardar_json(normales, fusiones)
+
+        print("Sets generados correctamente.")
+        return normales, fusiones
+
