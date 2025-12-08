@@ -52,17 +52,17 @@ class Controlador:
                 
                 self.cartas.append(carta)
             
-            print(f"✅ {len(self.cartas)} cartas cargadas exitosamente")
+            print(f" {len(self.cartas)} cartas cargadas exitosamente")
             return self.cartas
         
         except FileNotFoundError:
-            print(f"❌ Error: No se encontró el archivo {ruta_json}")
+            print(f" Error: No se encontró el archivo {ruta_json}")
             return []
         except json.JSONDecodeError:
-            print(f"❌ Error: El archivo JSON está mal formado")
+            print(f" Error: El archivo JSON está mal formado")
             return []
         except Exception as e:
-            print(f"❌ Error inesperado: {e}")
+            print(f" Error inesperado: {e}")
             return []
     
     def inicializar_juego(self, tamanio_deck=20):
@@ -76,11 +76,11 @@ class Controlador:
             Objeto Juego inicializado
         """
         if not self.cartas:
-            print("⚠️ Advertencia: No hay cartas cargadas. Cargando...")
+            print(" Advertencia: No hay cartas cargadas. Cargando...")
             self.cargar_cartas_desde_json()
         
         if len(self.cartas) < tamanio_deck * 2:
-            print(f"⚠️ Advertencia: Solo hay {len(self.cartas)} cartas disponibles")
+            print(f" Advertencia: Solo hay {len(self.cartas)} cartas disponibles")
             tamanio_deck = len(self.cartas) // 2
         
         self.juego = Juego(self.cartas, tamanio_deck)
@@ -101,7 +101,7 @@ class Controlador:
             atributos[carta.atributo] = atributos.get(carta.atributo, 0) + 1
             tipos[carta.tipo] = tipos.get(carta.tipo, 0) + 1
         
-        stats = f"📊 Estadísticas de cartas:\n"
+        stats = f" Estadísticas de cartas:\n"
         stats += f"Total: {len(self.cartas)}\n\n"
         stats += "Atributos:\n"
         for attr, count in sorted(atributos.items()):
