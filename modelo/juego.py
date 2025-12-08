@@ -220,7 +220,7 @@ class Juego:
     
     def realizar_batalla(self, atacante, defensor, atacante_jugador, defensor_jugador):
         """Ejecuta una batalla entre dos cartas"""
-        self.agregar_historial(f"⚔️ {atacante.nombre} ataca a {defensor.nombre}")
+        self.agregar_historial(f" {atacante.nombre} ataca a {defensor.nombre}")
         
         if defensor.posicion == "ataque":
             # Batalla ATK vs ATK
@@ -275,7 +275,7 @@ class Juego:
             # Agregar resultado a la mano
             self.jugador_humano.mano.append(resultado)
             
-            self.agregar_historial(f"🌟 Fusión exitosa: {carta1.nombre} + {carta2.nombre} = {resultado.nombre}")
+            self.agregar_historial(f" Fusión exitosa: {carta1.nombre} + {carta2.nombre} = {resultado.nombre}")
             return True, resultado
         
         return False, "Fusión no disponible"
@@ -284,11 +284,11 @@ class Juego:
         """Verifica si hay un ganador"""
         if self.jugador_humano.esta_derrotado():
             self.ganador = self.jugador_ia
-            self.agregar_historial("💀 Has sido derrotado. IA gana.")
+            self.agregar_historial(" Has sido derrotado. IA gana.")
         
         elif self.jugador_ia.esta_derrotado():
             self.ganador = self.jugador_humano
-            self.agregar_historial("🎉 ¡Victoria! Has derrotado a la IA.")
+            self.agregar_historial(" ¡Victoria! Has derrotado a la IA.")
     
     def agregar_historial(self, mensaje):
         """Agrega un mensaje al historial del juego"""
