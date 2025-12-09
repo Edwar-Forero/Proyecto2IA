@@ -104,38 +104,41 @@ class IAMinimax:
         """Genera acciones posibles con estrategia inteligente"""
         acciones = []
         
-        # 1. INVOCAR - Solo si no ha invocado en este turno
+        # 0. FUSIONAR - NUEVO: IA ahora considera fusiones
+        if len(jugador.mano) >= 2 and self.fusionador and self.cartas_disponibles:
+            fusiones_posibles = self.fusionador.obtener_fusiones_posibles(
+                jugador.mano,
+                self.cartas_disponibles
+            )
+            
+            # Evaluar solo fusiones beneficiosas
+            for carta1, carta2, resultado in fusiones_posibles[:3]:
+                if self.fusionador.es_fusion_beneficiosa(carta1, carta2, resultado):
+                    acciones.append(("fusionar", (carta1, carta2, resultado)))
+        
+        # 1. INVOCAR
         if jugador.puede_jugar_carta() and jugador.mano:
-            # Evaluar las mejores cartas para invocar
             cartas_ordenadas = sorted(jugador.mano, key=lambda c: c.atk, reverse=True)
             
-            for carta in cartas_ordenadas[:3]:  # Solo las 3 más fuertes
-                # Decidir posición inteligentemente
+            for carta in cartas_ordenadas[:3]:
                 if oponente.tiene_cartas_campo():
                     carta_enemiga_fuerte = max(oponente.campo, key=lambda c: c.atk)
                     
-                    # Invocar en ataque si somos más fuertes
                     if carta.atk > carta_enemiga_fuerte.atk * 1.2:
                         acciones.append(("jugar", (carta, "ataque")))
-                    # Invocar en defensa si somos más débiles pero tenemos buena DEF
                     elif carta.defensa > carta.atk:
                         acciones.append(("jugar", (carta, "defensa")))
                     else:
-                        # Por defecto ataque (ser agresivo)
                         acciones.append(("jugar", (carta, "ataque")))
                 else:
-                    # Sin oponente, invocar en defensa (regla del juego)
                     acciones.append(("jugar", (carta, "defensa")))
         
-        # 2. CAMBIAR POSICIÓN - Evaluar cambios estratégicos
+        # 2. CAMBIAR POSICIÓN
         for carta in jugador.campo:
-            # De defensa a ataque
             if carta.posicion == "defensa":
                 if not oponente.campo:
-                    # Sin enemigos, cambiar a ataque
                     acciones.append(("cambiar_posicion", carta))
                 elif oponente.campo:
-                    # Evaluar si es seguro atacar
                     puede_ganar = False
                     for enemigo in oponente.campo:
                         if enemigo.posicion == "ataque" and carta.atk > enemigo.atk:
@@ -146,10 +149,8 @@ class IAMinimax:
                     if puede_ganar:
                         acciones.append(("cambiar_posicion", carta))
             
-            # De ataque a defensa
             elif carta.posicion == "ataque":
                 if oponente.campo:
-                    # Calcular si vale la pena quedarse en ataque
                     puede_destruir_algo = False
                     
                     for enemigo in oponente.campo:
@@ -160,27 +161,22 @@ class IAMinimax:
                             puede_destruir_algo = True
                             break
                     
-                    # Si no puede destruir nada y su DEF es mejor, cambiar
                     if not puede_destruir_algo and carta.defensa > carta.atk:
                         acciones.append(("cambiar_posicion", carta))
         
-        # 3. ATACAR - Solo ataques inteligentes
+        # 3. ATACAR
         if jugador.tiene_cartas_campo() and oponente.tiene_cartas_campo():
             for atacante in jugador.campo:
                 if atacante.posicion == "ataque":
-                    # Buscar objetivos válidos
                     for objetivo in oponente.campo:
-                        # Atacar cartas en ataque si podemos ganar
                         if objetivo.posicion == "ataque" and atacante.atk > objetivo.atk:
                             acciones.append(("atacar", (atacante, objetivo)))
-                        # Atacar cartas en defensa si podemos destruirlas
                         elif objetivo.posicion == "defensa" and atacante.atk > objetivo.defensa:
                             acciones.append(("atacar", (atacante, objetivo)))
-                        # Atacar defensas solo si el daño es mínimo (< 300)
                         elif objetivo.posicion == "defensa" and (objetivo.defensa - atacante.atk) < 300:
                             acciones.append(("atacar", (atacante, objetivo)))
         
-        # 4. ATAQUE DIRECTO - Máxima prioridad si no hay defensa
+        # 4. ATAQUE DIRECTO
         if jugador.tiene_cartas_campo() and not oponente.tiene_cartas_campo():
             for atacante in jugador.campo:
                 if atacante.posicion == "ataque":
@@ -190,8 +186,8 @@ class IAMinimax:
         if not acciones:
             acciones.append(("pasar", None))
         
-        # Limitar a las 8 mejores acciones para eficiencia
-        return acciones[:8]
+        # Aumentar límite de acciones
+        return acciones[:12]  # De 8 a 12 para mejor exploración
     
     def _aplicar_accion(self, jugador, oponente, accion):
         """Aplica una acción al estado clonado"""
