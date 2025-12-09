@@ -313,6 +313,7 @@ class Juego:
                 "nombre": self.jugador_ia.nombre,
                 "vida": self.jugador_ia.puntos_vida,
                 "mano_size": len(self.jugador_ia.mano),
+                "mano": self.jugador_ia.mano,
                 "campo": self.jugador_ia.campo,
                 "deck_size": len(self.jugador_ia.deck),
             },
