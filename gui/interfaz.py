@@ -330,6 +330,65 @@ class InterfazYuGiOh:
         for w in frame.winfo_children():
             w.destroy()
 
+    # Agregar este método a la clase InterfazYuGiOh:
+    
+    def actualizar_botones_acciones(self):
+        """Actualiza el estado de los botones según las acciones realizadas"""
+        es_turno_jugador = self.juego.turno_actual == self.juego.jugador_humano
+        
+        if not es_turno_jugador:
+            # Deshabilitar todos los botones si no es turno del jugador
+            self.btn_fusionar.config(state=tk.DISABLED)
+            self.btn_modo_atacar.config(state=tk.DISABLED)
+            self.btn_cambiar_posicion.config(state=tk.DISABLED)
+            self.btn_terminar_turno.config(state=tk.DISABLED)
+            return
+        
+        # Habilitar/deshabilitar según acciones realizadas
+        
+        # Botón Fusionar
+        if self.juego.humano_fusiono or len(self.juego.jugador_humano.mano) < 2:
+            self.btn_fusionar.config(state=tk.DISABLED)
+        else:
+            self.btn_fusionar.config(state=tk.NORMAL)
+        
+        # Botón Modo Ataque
+        if self.juego.humano_ataco or not self.juego.jugador_humano.tiene_cartas_campo():
+            self.btn_modo_atacar.config(state=tk.DISABLED)
+        else:
+            cartas_ataque = [c for c in self.juego.jugador_humano.campo if c.posicion == "ataque"]
+            if cartas_ataque:
+                self.btn_modo_atacar.config(state=tk.NORMAL)
+            else:
+                self.btn_modo_atacar.config(state=tk.DISABLED)
+        
+        # Botón Cambiar Posición
+        if self.juego.humano_cambio_posicion or not self.juego.jugador_humano.tiene_cartas_campo():
+            self.btn_cambiar_posicion.config(state=tk.DISABLED)
+        else:
+            self.btn_cambiar_posicion.config(state=tk.NORMAL)
+        
+        # Botón Terminar Turno (siempre habilitado en turno del jugador)
+        self.btn_terminar_turno.config(state=tk.NORMAL)
+    
+    # Modificar el método cambiar_posicion_carta para usar la lógica del juego:
+    
+    def cambiar_posicion_carta(self, carta):
+        """Cambia la posición de una carta en el campo"""
+        if not carta:
+            return
+        
+        exito, msg = self.juego.cambiar_posicion_carta(carta)
+        
+        if not exito:
+            messagebox.showerror("Error", msg)
+        
+        self.cancelar_accion()
+        try:
+            self.actualizar_interfaz()
+        except Exception:
+            pass
+
     def actualizar_interfaz(self):
         """Lee el estado del juego y actualiza toda la UI"""
         estado = self.juego.obtener_estado_juego()
@@ -924,7 +983,7 @@ class InterfazYuGiOh:
         if exito:
             ventana.destroy()
             messagebox.showinfo(
-                " Fusión Exitosa",
+                "Fusión Exitosa",
                 f"Has fusionado:\n{carta1.nombre} + {carta2.nombre}\n\n"
                 f"Resultado: {resultado.nombre}\n"
                 f"ATK: {resultado.atk} | DEF: {resultado.defensa}"

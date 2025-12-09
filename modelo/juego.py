@@ -6,8 +6,6 @@ from modelo.fusionador import Fusionador
 class Juego:
     """Controla la lógica principal del juego de Yu-Gi-Oh!"""
     
-    # Agregar estas líneas al método __init__ de la clase Juego:
-
     def __init__(self, cartas_totales, tamanio_deck=20):
         """
         Inicializa el juego.
@@ -16,8 +14,18 @@ class Juego:
             cartas_totales: Lista de todas las cartas disponibles
             tamanio_deck: Número de cartas por deck (máximo 40)
         """
+        # === BANDERAS DE ACCIONES POR TURNO ===
+        # Jugador Humano
         self.humano_invoco_carta = False
+        self.humano_fusiono = False
+        self.humano_ataco = False
+        self.humano_cambio_posicion = False
+        
+        # IA
         self.ia_invoco_carta = False
+        self.ia_fusiono = False
+        self.ia_ataco = False
+        self.ia_cambio_posicion = False
 
         self.cartas_disponibles = cartas_totales
         self.tamanio_deck = min(tamanio_deck, 40)
@@ -32,13 +40,12 @@ class Juego:
         self.fusionador = Fusionador()
         
         # IMPORTANTE: Cargar cartas de fusión separadas
-        # Estas son las cartas violetas que se usan como resultado
         self.cartas_fusion = []
         
         # Inicializar IA con referencias al fusionador y cartas
         self.ia = IAMinimax(profundidad=2)
         self.ia.fusionador = self.fusionador
-        self.ia.cartas_disponibles = self.cartas_fusion  # Usar cartas de fusión
+        self.ia.cartas_disponibles = self.cartas_fusion
         
         self.ganador = None
         
@@ -46,21 +53,33 @@ class Juego:
         self.on_actualizar_interfaz = None
     
     def cargar_cartas_fusion(self, cartas_fusion):
-        """
-        Carga las cartas de fusión (violetas) disponibles.
-        Estas son las cartas que se obtienen como resultado de fusionar.
-        """
+        """Carga las cartas de fusión (violetas) disponibles."""
         self.cartas_fusion = cartas_fusion
         self.fusionador.cargar_cartas_fusion(cartas_fusion)
         if self.ia:
             self.ia.cartas_disponibles = cartas_fusion
     
+    def resetear_acciones_turno(self, jugador_tipo="humano"):
+        """Resetea las banderas de acciones al inicio de cada turno"""
+        if jugador_tipo == "humano":
+            self.humano_invoco_carta = False
+            self.humano_fusiono = False
+            self.humano_ataco = False
+            self.humano_cambio_posicion = False
+        else:
+            self.ia_invoco_carta = False
+            self.ia_fusiono = False
+            self.ia_ataco = False
+            self.ia_cambio_posicion = False
+    
     def inicializar_juego(self):
         """Prepara el juego con decks aleatorios"""
         self.ganador = None
         self.historial = []
-        self.humano_invoco_carta = False
-        self.ia_invoco_carta = False
+        
+        # Resetear TODAS las banderas de acciones
+        self.resetear_acciones_turno("humano")
+        self.resetear_acciones_turno("ia")
         
         # Crear decks aleatorios
         deck_completo = self.cartas_disponibles.copy()
@@ -90,7 +109,7 @@ class Juego:
         
         if self.turno_actual == self.jugador_humano:
             self.turno_actual = self.jugador_ia
-            self.ia_invoco_carta = False
+            self.resetear_acciones_turno("ia")
             
             # 1. IA Roba carta
             carta = self.jugador_ia.robar_carta()
@@ -103,7 +122,7 @@ class Juego:
             if self.on_actualizar_interfaz:
                 self.on_actualizar_interfaz()
             
-            # 2. IA Ejecuta su lógica (Minimax) - UNA sola acción por turno
+            # 2. IA Ejecuta su lógica (Minimax)
             self.ejecutar_turno_ia()
             
             # Verificar si alguien ganó durante el turno de la IA
@@ -113,7 +132,7 @@ class Juego:
             # --- VUELTA AL JUGADOR ---
             self.turno_actual = self.jugador_humano
             self.fase = "main"
-            self.humano_invoco_carta = False
+            self.resetear_acciones_turno("humano")
             
             self.agregar_historial("-" * 20)
             self.agregar_historial("--- TU TURNO ---")
@@ -135,8 +154,8 @@ class Juego:
         if mejor_accion:
             tipo, datos = mejor_accion
 
-            # ← AGREGAR ESTE BLOQUE COMPLETO
-            if tipo == "fusionar":
+            # FASE 0: FUSIONAR (nueva funcionalidad)
+            if tipo == "fusionar" and not self.ia_fusiono:
                 carta1, carta2, resultado = datos
                 c1 = next((c for c in self.jugador_ia.mano if c.nombre == carta1.nombre), None)
                 c2 = next((c for c in self.jugador_ia.mano if c.nombre == carta2.nombre and c != c1), None)
@@ -148,57 +167,60 @@ class Juego:
                     self.jugador_ia.cementerio.append(c2)
                     self.jugador_ia.mano.append(resultado)
                     
-                    self.agregar_historial(f"⚗️ IA fusionó: {c1.nombre} + {c2.nombre} = {resultado.nombre} (ATK: {resultado.atk})")
+                    self.ia_fusiono = True
+                    self.agregar_historial(f"IA fusionó: {c1.nombre} + {c2.nombre} = {resultado.nombre} (ATK: {resultado.atk})")
                     
                     if self.on_actualizar_interfaz:
                         self.on_actualizar_interfaz()
             
-            # FASE 1: INVOCAR (si Minimax lo decide)
-            if tipo == "jugar":
-                if not self.ia_invoco_carta:
-                    carta, posicion = datos
-                    carta_real = next((c for c in self.jugador_ia.mano if c.nombre == carta.nombre), None)
-                    if carta_real:
-                        self.jugador_ia.jugar_carta(carta_real, posicion)
-                        self.ia_invoco_carta = True
-                        self.agregar_historial(f"IA invocó: {carta_real.nombre} en posición {posicion} (ATK: {carta_real.atk}, DEF: {carta_real.defensa})")
-                        
-                        if self.on_actualizar_interfaz:
-                            self.on_actualizar_interfaz()
+            # FASE 1: INVOCAR
+            elif tipo == "jugar" and not self.ia_invoco_carta:
+                carta, posicion = datos
+                carta_real = next((c for c in self.jugador_ia.mano if c.nombre == carta.nombre), None)
+                if carta_real:
+                    self.jugador_ia.jugar_carta(carta_real, posicion)
+                    self.ia_invoco_carta = True
+                    self.agregar_historial(f"IA invocó: {carta_real.nombre} en posición {posicion} (ATK: {carta_real.atk}, DEF: {carta_real.defensa})")
+                    
+                    if self.on_actualizar_interfaz:
+                        self.on_actualizar_interfaz()
             
-            # FASE 2: ATACAR (si Minimax lo decide)
-            elif tipo == "atacar":
+            # FASE 2: ATACAR
+            elif tipo == "atacar" and not self.ia_ataco:
                 atacante, objetivo = datos
                 atacante_real = next((c for c in self.jugador_ia.campo if c.nombre == atacante.nombre), None)
                 objetivo_real = next((c for c in self.jugador_humano.campo if c.nombre == objetivo.nombre), None)
                 
                 if atacante_real and objetivo_real:
                     self.realizar_batalla(atacante_real, objetivo_real, self.jugador_ia, self.jugador_humano)
+                    self.ia_ataco = True
                     
                     if self.on_actualizar_interfaz:
                         self.on_actualizar_interfaz()
             
-            # FASE 3: ATAQUE DIRECTO (si Minimax lo decide)
-            elif tipo == "ataque_directo":
+            # FASE 3: ATAQUE DIRECTO
+            elif tipo == "ataque_directo" and not self.ia_ataco:
                 atacante = datos
                 atacante_real = next((c for c in self.jugador_ia.campo if c.nombre == atacante.nombre), None)
                 
                 if atacante_real and not self.jugador_humano.tiene_cartas_campo():
                     danio = atacante_real.atk
                     self.jugador_humano.recibir_danio(danio)
+                    self.ia_ataco = True
                     self.agregar_historial(f"¡Ataque directo! {atacante_real.nombre} te causa {danio} de daño.")
                     
                     self.verificar_ganador()
                     if self.on_actualizar_interfaz:
                         self.on_actualizar_interfaz()
             
-            # FASE 4: CAMBIAR POSICIÓN (si Minimax lo decide)
-            elif tipo == "cambiar_posicion":
+            # FASE 4: CAMBIAR POSICIÓN
+            elif tipo == "cambiar_posicion" and not self.ia_cambio_posicion:
                 carta = datos
                 carta_real = next((c for c in self.jugador_ia.campo if c.nombre == carta.nombre), None)
                 if carta_real:
                     posicion_anterior = carta_real.posicion
                     carta_real.cambiar_posicion()
+                    self.ia_cambio_posicion = True
                     self.agregar_historial(f"IA cambió {carta_real.nombre} de {posicion_anterior} a {carta_real.posicion}")
                     
                     if self.on_actualizar_interfaz:
@@ -213,7 +235,7 @@ class Juego:
             return False, "No es tu turno"
         
         if self.humano_invoco_carta:
-            return False, "Solo puedes invocar una carta por turno"
+            return False, "Ya invocaste una carta este turno"
         
         if carta not in self.jugador_humano.mano:
             return False, "Carta no está en tu mano"
@@ -234,6 +256,9 @@ class Juego:
         if self.turno_actual != self.jugador_humano:
             return False, "No es tu turno"
         
+        if self.humano_ataco:
+            return False, "Ya atacaste este turno"
+        
         if atacante not in self.jugador_humano.campo:
             return False, "Carta no está en tu campo"
         
@@ -244,13 +269,18 @@ class Juego:
             return False, "Objetivo inválido"
         
         self.realizar_batalla(atacante, objetivo, self.jugador_humano, self.jugador_ia)
+        self.humano_ataco = True
         return True, "Ataque realizado"
     
     def ataque_directo_humano(self, atacante):
         """Ataque directo a los puntos de vida del oponente"""
+        if self.humano_ataco:
+            return False, "Ya atacaste este turno"
+            
         if not self.jugador_ia.tiene_cartas_campo():
             danio = atacante.atk
             self.jugador_ia.recibir_danio(danio)
+            self.humano_ataco = True
             self.agregar_historial(f"¡Ataque directo! {atacante.nombre} causa {danio} de daño.")
             self.verificar_ganador()
             return True, "Ataque directo realizado"
@@ -305,6 +335,9 @@ class Juego:
         if self.turno_actual != self.jugador_humano:
             return False, "No es tu turno"
         
+        if self.humano_fusiono:
+            return False, " Ya fusionaste este turno"
+        
         # IMPORTANTE: Usar cartas_fusion (violetas) como disponibles
         cartas_fusion_disponibles = self.cartas_fusion if hasattr(self, 'cartas_fusion') and self.cartas_fusion else []
         
@@ -324,13 +357,30 @@ class Juego:
             # Agregar resultado a la mano
             self.jugador_humano.mano.append(resultado)
             
+            self.humano_fusiono = True
             self.agregar_historial(f"Fusión exitosa: {carta1.nombre} + {carta2.nombre} = {resultado.nombre} (ATK: {resultado.atk})")
             return True, resultado
         
         return False, "Fusión no disponible"
     
-    # Dentro de la clase Juego
-
+    def cambiar_posicion_carta(self, carta):
+        """Cambia la posición de una carta en el campo del jugador humano"""
+        if self.turno_actual != self.jugador_humano:
+            return False, "No es tu turno"
+        
+        if self.humano_cambio_posicion:
+            return False, "Ya cambiaste de posición este turno"
+    
+        if carta not in self.jugador_humano.campo:
+            return False, "Carta no está en tu campo"
+        
+        posicion_anterior = carta.posicion
+        carta.cambiar_posicion()
+        self.humano_cambio_posicion = True
+        
+        self.agregar_historial(f"Cambiaste {carta.nombre} de {posicion_anterior} a {carta.posicion}")
+        return True, "Posición cambiada exitosamente"
+    
     def verificar_ganador(self):
         """Verifica si hay un ganador"""
         
@@ -338,21 +388,19 @@ class Juego:
         if self.jugador_humano.esta_derrotado():
             self.ganador = self.jugador_ia
             
-            # Determinar la causa de la derrota para el historial
             if self.jugador_humano.puntos_vida <= 0:
-                self.agregar_historial(" Has sido derrotado. IA gana por Puntos de Vida.")
+                self.agregar_historial("Has sido derrotado. IA gana por Puntos de Vida.")
             else:
-                self.agregar_historial(" Has sido derrotado. IA gana por DECK OUT (Deck, Mano y Campo vacíos).")
+                self.agregar_historial("Has sido derrotado. IA gana por DECK OUT (Deck, Mano y Campo vacíos).")
         
         # 2. Verificar si la IA perdió
         elif self.jugador_ia.esta_derrotado():
             self.ganador = self.jugador_humano
             
-            # Determinar la causa de la victoria para el historial
             if self.jugador_ia.puntos_vida <= 0:
-                self.agregar_historial(" ¡Victoria! Has derrotado a la IA por Puntos de Vida.")
+                self.agregar_historial("¡Victoria! Has derrotado a la IA por Puntos de Vida.")
             else:
-                self.agregar_historial(" ¡Victoria! Has derrotado a la IA por DECK OUT (Deck, Mano y Campo vacíos).")
+                self.agregar_historial("¡Victoria! Has derrotado a la IA por DECK OUT (Deck, Mano y Campo vacíos).")
     
     def agregar_historial(self, mensaje):
         """Agrega un mensaje al historial del juego"""
@@ -368,6 +416,11 @@ class Juego:
                 "mano": self.jugador_humano.mano,
                 "campo": self.jugador_humano.campo,
                 "deck_size": len(self.jugador_humano.deck),
+                # Información de acciones disponibles
+                "puede_invocar": not self.humano_invoco_carta,
+                "puede_fusionar": not self.humano_fusiono,
+                "puede_atacar": not self.humano_ataco,
+                "puede_cambiar": not self.humano_cambio_posicion,
             },
             "ia": {
                 "nombre": self.jugador_ia.nombre,
