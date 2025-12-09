@@ -284,15 +284,30 @@ class Juego:
         
         return False, "Fusión no disponible"
     
+    # Dentro de la clase Juego
+
     def verificar_ganador(self):
         """Verifica si hay un ganador"""
+        
+        # 1. Verificar si el Jugador Humano perdió
         if self.jugador_humano.esta_derrotado():
             self.ganador = self.jugador_ia
-            self.agregar_historial(" Has sido derrotado. IA gana.")
+            
+            # Determinar la causa de la derrota para el historial
+            if self.jugador_humano.puntos_vida <= 0:
+                self.agregar_historial(" Has sido derrotado. IA gana por Puntos de Vida.")
+            else:
+                self.agregar_historial(" Has sido derrotado. IA gana por DECK OUT (Deck, Mano y Campo vacíos).")
         
+        # 2. Verificar si la IA perdió
         elif self.jugador_ia.esta_derrotado():
             self.ganador = self.jugador_humano
-            self.agregar_historial(" ¡Victoria! Has derrotado a la IA.")
+            
+            # Determinar la causa de la victoria para el historial
+            if self.jugador_ia.puntos_vida <= 0:
+                self.agregar_historial(" ¡Victoria! Has derrotado a la IA por Puntos de Vida.")
+            else:
+                self.agregar_historial(" ¡Victoria! Has derrotado a la IA por DECK OUT (Deck, Mano y Campo vacíos).")
     
     def agregar_historial(self, mensaje):
         """Agrega un mensaje al historial del juego"""
