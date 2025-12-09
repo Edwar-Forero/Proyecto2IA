@@ -101,49 +101,97 @@ class IAMinimax:
             return min_eval
     
     def _generar_acciones(self, jugador, oponente):
-        """Genera acciones posibles limitadas para eficiencia"""
+        """Genera acciones posibles con estrategia inteligente"""
         acciones = []
         
-        # 1. Jugar carta más fuerte
+        # 1. INVOCAR - Solo si no ha invocado en este turno
         if jugador.puede_jugar_carta() and jugador.mano:
-            carta_fuerte = max(jugador.mano, key=lambda c: c.atk)
+            # Evaluar las mejores cartas para invocar
+            cartas_ordenadas = sorted(jugador.mano, key=lambda c: c.atk, reverse=True)
             
-            if oponente.tiene_cartas_campo():
-                carta_enemiga = max(oponente.campo, key=lambda c: c.atk)
-                posicion = "ataque" if carta_fuerte.atk > carta_enemiga.atk else "defensa"
-            else:
-                posicion = "defensa"
-            
-            acciones.append(("jugar", (carta_fuerte, posicion)))
+            for carta in cartas_ordenadas[:3]:  # Solo las 3 más fuertes
+                # Decidir posición inteligentemente
+                if oponente.tiene_cartas_campo():
+                    carta_enemiga_fuerte = max(oponente.campo, key=lambda c: c.atk)
+                    
+                    # Invocar en ataque si somos más fuertes
+                    if carta.atk > carta_enemiga_fuerte.atk * 1.2:
+                        acciones.append(("jugar", (carta, "ataque")))
+                    # Invocar en defensa si somos más débiles pero tenemos buena DEF
+                    elif carta.defensa > carta.atk:
+                        acciones.append(("jugar", (carta, "defensa")))
+                    else:
+                        # Por defecto ataque (ser agresivo)
+                        acciones.append(("jugar", (carta, "ataque")))
+                else:
+                    # Sin oponente, invocar en defensa (regla del juego)
+                    acciones.append(("jugar", (carta, "defensa")))
         
-        # 2. Atacar (limitado a mejores opciones)
+        # 2. CAMBIAR POSICIÓN - Evaluar cambios estratégicos
+        for carta in jugador.campo:
+            # De defensa a ataque
+            if carta.posicion == "defensa":
+                if not oponente.campo:
+                    # Sin enemigos, cambiar a ataque
+                    acciones.append(("cambiar_posicion", carta))
+                elif oponente.campo:
+                    # Evaluar si es seguro atacar
+                    puede_ganar = False
+                    for enemigo in oponente.campo:
+                        if enemigo.posicion == "ataque" and carta.atk > enemigo.atk:
+                            puede_ganar = True
+                        elif enemigo.posicion == "defensa" and carta.atk > enemigo.defensa:
+                            puede_ganar = True
+                    
+                    if puede_ganar:
+                        acciones.append(("cambiar_posicion", carta))
+            
+            # De ataque a defensa
+            elif carta.posicion == "ataque":
+                if oponente.campo:
+                    # Calcular si vale la pena quedarse en ataque
+                    puede_destruir_algo = False
+                    
+                    for enemigo in oponente.campo:
+                        if enemigo.posicion == "ataque" and carta.atk > enemigo.atk:
+                            puede_destruir_algo = True
+                            break
+                        elif enemigo.posicion == "defensa" and carta.atk > enemigo.defensa:
+                            puede_destruir_algo = True
+                            break
+                    
+                    # Si no puede destruir nada y su DEF es mejor, cambiar
+                    if not puede_destruir_algo and carta.defensa > carta.atk:
+                        acciones.append(("cambiar_posicion", carta))
+        
+        # 3. ATACAR - Solo ataques inteligentes
         if jugador.tiene_cartas_campo() and oponente.tiene_cartas_campo():
             for atacante in jugador.campo:
                 if atacante.posicion == "ataque":
-                    # Solo atacar al objetivo más débil
-                    objetivo_debil = min(oponente.campo, key=lambda c: c.obtener_poder())
-                    acciones.append(("atacar", (atacante, objetivo_debil)))
-                    break  # Solo una opción de ataque para eficiencia
+                    # Buscar objetivos válidos
+                    for objetivo in oponente.campo:
+                        # Atacar cartas en ataque si podemos ganar
+                        if objetivo.posicion == "ataque" and atacante.atk > objetivo.atk:
+                            acciones.append(("atacar", (atacante, objetivo)))
+                        # Atacar cartas en defensa si podemos destruirlas
+                        elif objetivo.posicion == "defensa" and atacante.atk > objetivo.defensa:
+                            acciones.append(("atacar", (atacante, objetivo)))
+                        # Atacar defensas solo si el daño es mínimo (< 300)
+                        elif objetivo.posicion == "defensa" and (objetivo.defensa - atacante.atk) < 300:
+                            acciones.append(("atacar", (atacante, objetivo)))
         
-        # 3. Ataque directo
+        # 4. ATAQUE DIRECTO - Máxima prioridad si no hay defensa
         if jugador.tiene_cartas_campo() and not oponente.tiene_cartas_campo():
             for atacante in jugador.campo:
                 if atacante.posicion == "ataque":
                     acciones.append(("ataque_directo", atacante))
-                    break
         
-        # 4. Cambiar posición (solo las más estratégicas)
-        for carta in jugador.campo[:2]:  # Solo primeras 2 cartas
-            if carta.posicion == "defensa" and not oponente.campo:
-                acciones.append(("cambiar_posicion", carta))
-            elif carta.posicion == "ataque" and oponente.campo:
-                if carta.atk < max(c.atk for c in oponente.campo):
-                    acciones.append(("cambiar_posicion", carta))
-        
+        # 5. Si no hay acciones, pasar
         if not acciones:
             acciones.append(("pasar", None))
         
-        return acciones[:5]  # Limitar a 5 acciones máximo
+        # Limitar a las 8 mejores acciones para eficiencia
+        return acciones[:8]
     
     def _aplicar_accion(self, jugador, oponente, accion):
         """Aplica una acción al estado clonado"""
@@ -203,33 +251,57 @@ class IAMinimax:
             # Si son iguales, no pasa nada
     
     def elegir_mejor_jugada(self, ia_jugador, oponente):
-        """Elige la mejor jugada usando Minimax - SIMPLIFICADO"""
+        """Elige la mejor jugada usando Minimax con priorización inteligente"""
         mejor_accion = None
         mejor_valor = -math.inf
         
         acciones = self._generar_acciones(ia_jugador, oponente)
         
-        # Priorizar: invocar > atacar > cambiar posición
+        # Priorizar acciones por tipo
+        acciones_ataque_directo = [a for a in acciones if a[0] == "ataque_directo"]
         acciones_invocar = [a for a in acciones if a[0] == "jugar"]
-        acciones_ataque = [a for a in acciones if a[0] in ["atacar", "ataque_directo"]]
+        acciones_atacar = [a for a in acciones if a[0] == "atacar"]
         acciones_cambio = [a for a in acciones if a[0] == "cambiar_posicion"]
         acciones_pasar = [a for a in acciones if a[0] == "pasar"]
         
-        acciones_priorizadas = acciones_invocar + acciones_ataque + acciones_cambio + acciones_pasar
+        # Ordenar por prioridad estratégica
+        # 1. Ataque directo (gana LP inmediatamente)
+        # 2. Invocar (aumenta presencia en campo)
+        # 3. Atacar (elimina amenazas)
+        # 4. Cambiar posición (ajuste táctico)
+        # 5. Pasar (última opción)
+        acciones_priorizadas = (acciones_ataque_directo + 
+                               acciones_invocar + 
+                               acciones_atacar + 
+                               acciones_cambio + 
+                               acciones_pasar)
         
         for accion in acciones_priorizadas:
+            # Clonar estado
             clon_ia = ia_jugador.clonar()
             clon_oponente = oponente.clonar()
+            
+            # Aplicar acción
             self._aplicar_accion(clon_ia, clon_oponente, accion)
             
+            # Evaluar con Minimax (el oponente juega después)
             valor = self.minimax(
                 clon_ia,
                 clon_oponente,
                 self.profundidad - 1,
                 -math.inf,
                 math.inf,
-                False
+                False  # El siguiente turno es del oponente (minimizador)
             )
+            
+            # Bonus por tipo de acción (para desempatar)
+            tipo_accion = accion[0]
+            if tipo_accion == "ataque_directo":
+                valor += 500  # Gran bonus por ataque directo
+            elif tipo_accion == "atacar":
+                valor += 100  # Bonus moderado por atacar
+            elif tipo_accion == "jugar":
+                valor += 50   # Bonus pequeño por invocar
             
             if valor > mejor_valor:
                 mejor_valor = valor
