@@ -50,7 +50,15 @@ class Jugador:
     
     def esta_derrotado(self):
         """Verifica si el jugador ha perdido"""
-        return self.puntos_vida <= 0
+                # Derrota por Life Points
+        if self.puntos_vida <= 0:
+            return True
+
+        # Derrota por deck vacío + mano vacía + campo vacío
+        if len(self.deck) == 0 and len(self.mano) == 0 and len(self.campo) == 0:
+            return True
+
+        return False
     
     def tiene_cartas_campo(self):
         """Verifica si tiene cartas en el campo"""

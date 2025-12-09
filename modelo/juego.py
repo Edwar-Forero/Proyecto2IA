@@ -229,36 +229,36 @@ class Juego:
                 diferencia = atacante.atk - defensor.atk
                 defensor_jugador.recibir_danio(diferencia)
                 defensor_jugador.remover_carta_campo(defensor)
-                self.agregar_historial(f"   ✓ {defensor.nombre} destruido! {defensor_jugador.nombre} pierde {diferencia} LP")
+                self.agregar_historial(f"   - {defensor.nombre} destruido! {defensor_jugador.nombre} pierde {diferencia} LP")
             
             elif atacante.atk < defensor.atk:
                 diferencia = defensor.atk - atacante.atk
                 atacante_jugador.recibir_danio(diferencia)
                 atacante_jugador.remover_carta_campo(atacante)
-                self.agregar_historial(f"   ✗ {atacante.nombre} destruido! {atacante_jugador.nombre} pierde {diferencia} LP")
+                self.agregar_historial(f"   - {atacante.nombre} destruido! {atacante_jugador.nombre} pierde {diferencia} LP")
             
             else:
                 # Empate - ambas destruidas, SIN daño a jugadores
                 atacante_jugador.remover_carta_campo(atacante)
                 defensor_jugador.remover_carta_campo(defensor)
-                self.agregar_historial(f"   ⚡ ¡Ambas cartas destruidas! Sin daño a LP")
+                self.agregar_historial(f"   - ¡Ambas cartas destruidas! Sin daño a LP")
         
         else:  # Posición defensa
             # Batalla ATK vs DEF - Sin daño al dueño del defensor
             if atacante.atk > defensor.defensa:
                 # Carta en defensa destruida, PERO sin daño al jugador defensor
                 defensor_jugador.remover_carta_campo(defensor)
-                self.agregar_historial(f"   ✓ {defensor.nombre} destruido! (Sin daño a LP)")
+                self.agregar_historial(f"   - {defensor.nombre} destruido! (Sin daño a LP)")
             
             elif atacante.atk < defensor.defensa:
                 # Ataque fallido - daño al atacante
                 diferencia = defensor.defensa - atacante.atk
                 atacante_jugador.recibir_danio(diferencia)
-                self.agregar_historial(f"   ✗ Ataque fallido! {atacante_jugador.nombre} pierde {diferencia} LP")
+                self.agregar_historial(f"   - Ataque fallido! {atacante_jugador.nombre} pierde {diferencia} LP")
             
             else:
                 # Empate - sin destrucción, sin daño
-                self.agregar_historial(f"   ○ Sin daño, {defensor.nombre} resiste.")
+                self.agregar_historial(f"   - Sin daño, {defensor.nombre} resiste.")
         
         self.verificar_ganador()
     
@@ -279,7 +279,7 @@ class Juego:
             # Agregar resultado a la mano
             self.jugador_humano.mano.append(resultado)
             
-            self.agregar_historial(f"✨ Fusión exitosa: {carta1.nombre} + {carta2.nombre} = {resultado.nombre}")
+            self.agregar_historial(f" Fusión exitosa: {carta1.nombre} + {carta2.nombre} = {resultado.nombre}")
             return True, resultado
         
         return False, "Fusión no disponible"
@@ -288,11 +288,11 @@ class Juego:
         """Verifica si hay un ganador"""
         if self.jugador_humano.esta_derrotado():
             self.ganador = self.jugador_ia
-            self.agregar_historial("💀 Has sido derrotado. IA gana.")
+            self.agregar_historial(" Has sido derrotado. IA gana.")
         
         elif self.jugador_ia.esta_derrotado():
             self.ganador = self.jugador_humano
-            self.agregar_historial("🏆 ¡Victoria! Has derrotado a la IA.")
+            self.agregar_historial(" ¡Victoria! Has derrotado a la IA.")
     
     def agregar_historial(self, mensaje):
         """Agrega un mensaje al historial del juego"""
