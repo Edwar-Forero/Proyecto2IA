@@ -3,9 +3,9 @@ import math
 class IAMinimax:
     """Implementa el algoritmo Minimax con poda alfa-beta para Yu-Gi-Oh!"""
     
-    def __init__(self, profundidad=3):
+    def __init__(self, profundidad=2):
         self.profundidad = profundidad
-        self.fusionador = None  # Se asignará desde el juego
+        self.fusionador = None
     
     def evaluar_estado(self, jugador_max, jugador_min):
         """
@@ -20,37 +20,27 @@ class IAMinimax:
         fuerza_min = sum(c.obtener_poder() for c in jugador_min.campo)
         diferencia_fuerza = fuerza_max - fuerza_min
         
-        # Ventaja de cartas en mano
+        # Ventaja de cartas
         diferencia_mano = len(jugador_max.mano) - len(jugador_min.mano)
-        
-        # Ventaja de cartas en campo
         diferencia_campo = len(jugador_max.campo) - len(jugador_min.campo)
+        
+        # Bonificación por cartas en ataque
+        cartas_ataque_max = sum(1 for c in jugador_max.campo if c.posicion == "ataque")
+        cartas_ataque_min = sum(1 for c in jugador_min.campo if c.posicion == "ataque")
         
         # Cálculo ponderado
         evaluacion = (
-            diferencia_vida * 2 +           # Vida es importante
-            diferencia_fuerza * 0.5 +       # Fuerza en campo
-            diferencia_mano * 100 +         # Cartas en mano
-            diferencia_campo * 150          # Control del campo
+            diferencia_vida * 2 +
+            diferencia_fuerza * 0.5 +
+            diferencia_mano * 100 +
+            diferencia_campo * 150 +
+            (cartas_ataque_max - cartas_ataque_min) * 50
         )
         
         return evaluacion
     
     def minimax(self, jugador_max, jugador_min, profundidad, alfa, beta, es_maximizador):
-        """
-        Algoritmo Minimax con poda alfa-beta.
-        
-        Args:
-            jugador_max: Jugador que maximiza (IA)
-            jugador_min: Jugador que minimiza (oponente)
-            profundidad: Profundidad actual de búsqueda
-            alfa: Mejor valor para el maximizador
-            beta: Mejor valor para el minimizador
-            es_maximizador: True si es turno del maximizador
-        
-        Returns:
-            Valor de la evaluación del estado
-        """
+        """Algoritmo Minimax con poda alfa-beta"""
         # Condiciones de parada
         if profundidad == 0 or jugador_max.esta_derrotado() or jugador_min.esta_derrotado():
             return self.evaluar_estado(jugador_max, jugador_min)
@@ -60,19 +50,13 @@ class IAMinimax:
         
         if es_maximizador:
             max_eval = -math.inf
-            
-            # Generar todas las acciones posibles
             acciones = self._generar_acciones(jugador_actual, oponente)
             
             for accion in acciones:
-                # Clonar estado
                 clon_actual = jugador_actual.clonar()
                 clon_oponente = oponente.clonar()
-                
-                # Aplicar acción
                 self._aplicar_accion(clon_actual, clon_oponente, accion)
                 
-                # Recursión
                 eval = self.minimax(
                     clon_actual if es_maximizador else clon_oponente,
                     clon_oponente if es_maximizador else clon_actual,
@@ -86,19 +70,17 @@ class IAMinimax:
                 alfa = max(alfa, eval)
                 
                 if beta <= alfa:
-                    break  # Poda beta
+                    break
             
             return max_eval
         
-        else:  # Minimizador
+        else:
             min_eval = math.inf
-            
             acciones = self._generar_acciones(jugador_actual, oponente)
             
             for accion in acciones:
                 clon_actual = jugador_actual.clonar()
                 clon_oponente = oponente.clonar()
-                
                 self._aplicar_accion(clon_actual, clon_oponente, accion)
                 
                 eval = self.minimax(
@@ -114,75 +96,89 @@ class IAMinimax:
                 beta = min(beta, eval)
                 
                 if beta <= alfa:
-                    break  # Poda alfa
+                    break
             
             return min_eval
     
     def _generar_acciones(self, jugador, oponente):
-        """
-        Genera todas las acciones posibles para el jugador actual.
-        
-        Returns:
-            Lista de tuplas (tipo_accion, datos)
-        """
+        """Genera acciones posibles limitadas para eficiencia"""
         acciones = []
         
-        # 1. Jugar una carta de la mano al campo
-        if jugador.puede_jugar_carta():
-            for carta in jugador.mano:
-                acciones.append(("jugar", carta))
+        # 1. Jugar carta más fuerte
+        if jugador.puede_jugar_carta() and jugador.mano:
+            carta_fuerte = max(jugador.mano, key=lambda c: c.atk)
+            
+            if oponente.tiene_cartas_campo():
+                carta_enemiga = max(oponente.campo, key=lambda c: c.atk)
+                posicion = "ataque" if carta_fuerte.atk > carta_enemiga.atk else "defensa"
+            else:
+                posicion = "defensa"
+            
+            acciones.append(("jugar", (carta_fuerte, posicion)))
         
-        # 2. Atacar con cartas en el campo
+        # 2. Atacar (limitado a mejores opciones)
         if jugador.tiene_cartas_campo() and oponente.tiene_cartas_campo():
             for atacante in jugador.campo:
                 if atacante.posicion == "ataque":
-                    for objetivo in oponente.campo:
-                        acciones.append(("atacar", (atacante, objetivo)))
+                    # Solo atacar al objetivo más débil
+                    objetivo_debil = min(oponente.campo, key=lambda c: c.obtener_poder())
+                    acciones.append(("atacar", (atacante, objetivo_debil)))
+                    break  # Solo una opción de ataque para eficiencia
         
-        # 3. Ataque directo si el oponente no tiene cartas
+        # 3. Ataque directo
         if jugador.tiene_cartas_campo() and not oponente.tiene_cartas_campo():
             for atacante in jugador.campo:
                 if atacante.posicion == "ataque":
                     acciones.append(("ataque_directo", atacante))
+                    break
         
-        # 4. Cambiar posición de cartas
-        for carta in jugador.campo:
-            acciones.append(("cambiar_posicion", carta))
+        # 4. Cambiar posición (solo las más estratégicas)
+        for carta in jugador.campo[:2]:  # Solo primeras 2 cartas
+            if carta.posicion == "defensa" and not oponente.campo:
+                acciones.append(("cambiar_posicion", carta))
+            elif carta.posicion == "ataque" and oponente.campo:
+                if carta.atk < max(c.atk for c in oponente.campo):
+                    acciones.append(("cambiar_posicion", carta))
         
-        # Si no hay acciones, pasar turno
         if not acciones:
             acciones.append(("pasar", None))
         
-        return acciones
+        return acciones[:5]  # Limitar a 5 acciones máximo
     
     def _aplicar_accion(self, jugador, oponente, accion):
-        """Aplica una acción al estado del juego clonado"""
+        """Aplica una acción al estado clonado"""
         tipo, datos = accion
         
         if tipo == "jugar":
-            carta = datos
-            if carta in jugador.mano:
-                jugador.jugar_carta(carta)
+            carta, posicion = datos
+            carta_en_mano = next((c for c in jugador.mano if c.nombre == carta.nombre), None)
+            if carta_en_mano:
+                jugador.jugar_carta(carta_en_mano, posicion)
         
         elif tipo == "atacar":
             atacante, objetivo = datos
-            if atacante in jugador.campo and objetivo in oponente.campo:
-                danio = self._calcular_batalla(atacante, objetivo, jugador, oponente)
+            atacante_en_campo = next((c for c in jugador.campo if c.nombre == atacante.nombre), None)
+            objetivo_en_campo = next((c for c in oponente.campo if c.nombre == objetivo.nombre), None)
+            
+            if atacante_en_campo and objetivo_en_campo:
+                self._simular_batalla(atacante_en_campo, objetivo_en_campo, jugador, oponente)
         
         elif tipo == "ataque_directo":
             atacante = datos
-            if atacante in jugador.campo:
-                oponente.recibir_danio(atacante.atk)
+            atacante_en_campo = next((c for c in jugador.campo if c.nombre == atacante.nombre), None)
+            if atacante_en_campo:
+                oponente.recibir_danio(atacante_en_campo.atk)
         
         elif tipo == "cambiar_posicion":
             carta = datos
-            if carta in jugador.campo:
-                carta.cambiar_posicion()
+            carta_en_campo = next((c for c in jugador.campo if c.nombre == carta.nombre), None)
+            if carta_en_campo:
+                carta_en_campo.cambiar_posicion()
     
-    def _calcular_batalla(self, atacante, defensor, atacante_jugador, defensor_jugador):
-        """Calcula el resultado de una batalla entre dos cartas"""
+    def _simular_batalla(self, atacante, defensor, atacante_jugador, defensor_jugador):
+        """Simula batalla para clones según reglas de Forbidden Memories"""
         if defensor.posicion == "ataque":
-            # Batalla ATK vs ATK
+            # Batalla ATK vs ATK - Daño al jugador por diferencia
             if atacante.atk > defensor.atk:
                 diferencia = atacante.atk - defensor.atk
                 defensor_jugador.recibir_danio(diferencia)
@@ -192,46 +188,47 @@ class IAMinimax:
                 atacante_jugador.recibir_danio(diferencia)
                 atacante_jugador.remover_carta_campo(atacante)
             else:
-                # Empate, ambas destruidas
+                # Empate - ambas destruidas, SIN daño
                 defensor_jugador.remover_carta_campo(defensor)
                 atacante_jugador.remover_carta_campo(atacante)
-        
-        else:  # Posición defensa
-            # Batalla ATK vs DEF
+        else:
+            # Batalla ATK vs DEF - Sin daño al defensor
             if atacante.atk > defensor.defensa:
+                # Destruye pero SIN daño al jugador defensor
                 defensor_jugador.remover_carta_campo(defensor)
             elif atacante.atk < defensor.defensa:
+                # Daño de retroceso al atacante
                 diferencia = defensor.defensa - atacante.atk
                 atacante_jugador.recibir_danio(diferencia)
+            # Si son iguales, no pasa nada
     
     def elegir_mejor_jugada(self, ia_jugador, oponente):
-        """
-        Elige la mejor jugada usando Minimax.
-        
-        Returns:
-            Tupla (tipo_accion, datos) de la mejor acción
-        """
+        """Elige la mejor jugada usando Minimax - SIMPLIFICADO"""
         mejor_accion = None
         mejor_valor = -math.inf
         
         acciones = self._generar_acciones(ia_jugador, oponente)
         
-        for accion in acciones:
-            # Clonar estado
+        # Priorizar: invocar > atacar > cambiar posición
+        acciones_invocar = [a for a in acciones if a[0] == "jugar"]
+        acciones_ataque = [a for a in acciones if a[0] in ["atacar", "ataque_directo"]]
+        acciones_cambio = [a for a in acciones if a[0] == "cambiar_posicion"]
+        acciones_pasar = [a for a in acciones if a[0] == "pasar"]
+        
+        acciones_priorizadas = acciones_invocar + acciones_ataque + acciones_cambio + acciones_pasar
+        
+        for accion in acciones_priorizadas:
             clon_ia = ia_jugador.clonar()
             clon_oponente = oponente.clonar()
-            
-            # Aplicar acción
             self._aplicar_accion(clon_ia, clon_oponente, accion)
             
-            # Evaluar con Minimax
             valor = self.minimax(
                 clon_ia,
                 clon_oponente,
                 self.profundidad - 1,
                 -math.inf,
                 math.inf,
-                False  # El siguiente turno es del oponente (minimizador)
+                False
             )
             
             if valor > mejor_valor:
