@@ -46,6 +46,8 @@ class InterfazYuGiOh:
         # Crear layout dentro del contenedor scrolleable
         self._crear_layout(self.scroll_frame)
 
+        self.cartas_fusion = []
+
         
         # Intentar actualizar vista inicial
         try:
@@ -249,6 +251,13 @@ class InterfazYuGiOh:
             ctrl_frame, text="Controles", bg="#071025", fg="#cfe7ff",
             font=("Helvetica", 11, "bold")
         ).pack(pady=(6,0), anchor="e")  # derecha
+
+        self.btn_fusionar = tk.Button(
+            ctrl_frame, text=" Fusionar Cartas",
+            command=self.modo_fusionar, width=20,
+            bg="#9b59b6", fg="white"
+        )
+        self.btn_fusionar.pack(pady=6, anchor="e")
 
         self.btn_modo_atacar = tk.Button(
             ctrl_frame, text="Modo Ataque", command=self.modo_atacar, width=20
@@ -531,16 +540,16 @@ class InterfazYuGiOh:
         # --- LÓGICA DE RESTRICCIÓN DE POSICIÓN ---
         if ia_tiene_cartas:
             # Opción por defecto: Ataque, si hay cartas IA
-            tk.Radiobutton(btn_frame, text="⚔ Modo Ataque", variable=posicion_elegida, value="ataque", 
+            tk.Radiobutton(btn_frame, text=" Modo Ataque", variable=posicion_elegida, value="ataque", 
                           bg="#071025", fg="#ff6b6b", selectcolor="#071025", font=("Helvetica", 10)).pack(pady=5, anchor="w")
             tk.Radiobutton(btn_frame, text="🛡 Modo Defensa", variable=posicion_elegida, value="defensa",
                           bg="#071025", fg="#6baaff", selectcolor="#071025", font=("Helvetica", 10)).pack(pady=5, anchor="w")
         else:
             # Opción obligatoria: Defensa, si no hay cartas IA
             # No se usa Radiobutton para "defensa" sino una etiqueta para hacerlo obligatorio.
-            tk.Label(dialogo, text="⚠ La IA no tiene cartas en campo\nSolo puedes invocar en Modo Defensa", 
+            tk.Label(dialogo, text=" La IA no tiene cartas en campo\nSolo puedes invocar en Modo Defensa", 
                      bg="#071025", fg="#ffaa00", font=("Helvetica", 9, "bold")).pack(pady=5)
-            tk.Label(btn_frame, text="🛡 Modo Defensa (obligatorio)", bg="#071025", fg="#6baaff", 
+            tk.Label(btn_frame, text=" Modo Defensa (obligatorio)", bg="#071025", fg="#6baaff", 
                      font=("Helvetica", 11, "bold")).pack(pady=5)
             
         # --- Fin LÓGICA DE RESTRICCIÓN DE POSICIÓN ---
@@ -666,11 +675,15 @@ class InterfazYuGiOh:
         """Cancela cualquier acción en progreso"""
         self.modo_seleccion = None
         self.carta_seleccionada = None
+        self.cartas_fusion = []
         
         self.btn_cancelar.config(state=tk.DISABLED, bg="#f0f0f0", fg="black")
         self.btn_modo_atacar.config(state=tk.NORMAL)
         self.btn_cambiar_posicion.config(state=tk.NORMAL)
         
+        if hasattr(self, 'btn_fusionar'):  # ← Agregar estas 2 líneas
+            self.btn_fusionar.config(state=tk.NORMAL)
+
         try:
             self.actualizar_interfaz()
         except Exception:
@@ -755,3 +768,170 @@ class InterfazYuGiOh:
             self._reiniciar_desde_interfaz()
         else:
             self.root.quit()
+
+    # ========== MÉTODOS DE FUSIÓN ==========
+    # Agregar estos métodos a la clase InterfazYuGiOh
+    
+    def modo_fusionar(self):
+        """Activa el modo de fusión"""
+        if self.juego.turno_actual != self.juego.jugador_humano:
+            messagebox.showwarning("Advertencia", "No es tu turno")
+            return
+        
+        if len(self.juego.jugador_humano.mano) < 2:
+            messagebox.showwarning("Advertencia", "Necesitas al menos 2 cartas en tu mano para fusionar")
+            return
+        
+        # IMPORTANTE: Usar cartas de FUSIÓN (violetas) como disponibles
+        cartas_fusion_disponibles = self.juego.cartas_fusion if hasattr(self.juego, 'cartas_fusion') else []
+        
+        # Debug: Mostrar información
+        print(f" DEBUG Fusiones:")
+        print(f"  - Cartas en mano: {len(self.juego.jugador_humano.mano)}")
+        print(f"  - Cartas de fusión disponibles: {len(cartas_fusion_disponibles)}")
+        
+        if not cartas_fusion_disponibles:
+            messagebox.showwarning("Sin fusiones", "No hay cartas de fusión disponibles en el sistema.\n\nAsegúrate de que fusiones.json esté cargado correctamente.")
+            return
+        
+        # Obtener fusiones posibles usando las cartas de fusión
+        fusiones_posibles = self.juego.fusionador.obtener_fusiones_posibles(
+            self.juego.jugador_humano.mano,
+            cartas_fusion_disponibles  # Usar cartas violetas
+        )
+        
+        print(f"  - Fusiones posibles encontradas: {len(fusiones_posibles)}")
+        
+        if not fusiones_posibles:
+            # Mostrar información de debug al usuario
+            mensaje = "No hay fusiones disponibles con tus cartas actuales.\n\n"
+            mensaje += " Tus cartas:\n"
+            for carta in self.juego.jugador_humano.mano:
+                mensaje += f"  • {carta.nombre} ({carta.atributo}, {carta.tipo})\n"
+            
+            messagebox.showinfo("Sin fusiones", mensaje)
+            return
+        
+        # Mostrar ventana de selección de fusión
+        self._mostrar_ventana_fusiones(fusiones_posibles)
+    
+    def _mostrar_ventana_fusiones(self, fusiones_posibles):
+        """Muestra una ventana con todas las fusiones disponibles"""
+        ventana = tk.Toplevel(self.root)
+        ventana.title(" Fusiones Disponibles")
+        ventana.geometry("700x600")
+        ventana.configure(bg="#071025")
+        ventana.transient(self.root)
+        ventana.grab_set()
+        
+        tk.Label(
+            ventana,
+            text=" Selecciona una fusión para realizar",
+            bg="#071025",
+            fg="#fff",
+            font=("Helvetica", 14, "bold")
+        ).pack(pady=10)
+        
+        # Frame con scroll para las fusiones
+        canvas = tk.Canvas(ventana, bg="#071025", highlightthickness=0)
+        scrollbar = tk.Scrollbar(ventana, orient="vertical", command=canvas.yview)
+        scroll_frame = tk.Frame(canvas, bg="#071025")
+        
+        scroll_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Mostrar cada fusión
+        for idx, (carta1, carta2, resultado) in enumerate(fusiones_posibles):
+            fusion_frame = tk.Frame(scroll_frame, bg="#0a1a2a", relief=tk.RAISED, bd=2)
+            fusion_frame.pack(fill=tk.X, padx=10, pady=8)
+            
+            # Frame interno con layout horizontal
+            inner_frame = tk.Frame(fusion_frame, bg="#0a1a2a")
+            inner_frame.pack(fill=tk.X, padx=10, pady=10)
+            
+            # Carta 1
+            c1_frame = tk.Frame(inner_frame, bg="#0a1a2a")
+            c1_frame.pack(side=tk.LEFT, padx=5)
+            img1 = self.cargar_imagen_carta(carta1, width=80, height=110)
+            lbl1 = tk.Label(c1_frame, image=img1, bg="#0a1a2a")
+            lbl1.image = img1
+            lbl1.pack()
+            tk.Label(c1_frame, text=carta1.nombre[:12], bg="#0a1a2a", fg="#cfe7ff", font=("Helvetica", 8)).pack()
+            tk.Label(c1_frame, text=f"ATK: {carta1.atk}", bg="#0a1a2a", fg="#f0d8a8", font=("Helvetica", 8)).pack()
+            
+            # Símbolo +
+            tk.Label(inner_frame, text="+", bg="#0a1a2a", fg="#ffcc00", font=("Helvetica", 24, "bold")).pack(side=tk.LEFT, padx=10)
+            
+            # Carta 2
+            c2_frame = tk.Frame(inner_frame, bg="#0a1a2a")
+            c2_frame.pack(side=tk.LEFT, padx=5)
+            img2 = self.cargar_imagen_carta(carta2, width=80, height=110)
+            lbl2 = tk.Label(c2_frame, image=img2, bg="#0a1a2a")
+            lbl2.image = img2
+            lbl2.pack()
+            tk.Label(c2_frame, text=carta2.nombre[:12], bg="#0a1a2a", fg="#cfe7ff", font=("Helvetica", 8)).pack()
+            tk.Label(c2_frame, text=f"ATK: {carta2.atk}", bg="#0a1a2a", fg="#f0d8a8", font=("Helvetica", 8)).pack()
+            
+            # Flecha
+            tk.Label(inner_frame, text="→", bg="#0a1a2a", fg="#00ff00", font=("Helvetica", 24, "bold")).pack(side=tk.LEFT, padx=10)
+            
+            # Resultado
+            res_frame = tk.Frame(inner_frame, bg="#0a1a2a")
+            res_frame.pack(side=tk.LEFT, padx=5)
+            img_res = self.cargar_imagen_carta(resultado, width=100, height=140)
+            lbl_res = tk.Label(res_frame, image=img_res, bg="#0a1a2a")
+            lbl_res.image = img_res
+            lbl_res.pack()
+            tk.Label(res_frame, text=resultado.nombre[:15], bg="#0a1a2a", fg="#00ff00", font=("Helvetica", 9, "bold")).pack()
+            tk.Label(res_frame, text=f"ATK: {resultado.atk}", bg="#0a1a2a", fg="#00ff00", font=("Helvetica", 9)).pack()
+            tk.Label(res_frame, text=f"DEF: {resultado.defensa}", bg="#0a1a2a", fg="#00ff00", font=("Helvetica", 9)).pack()
+            
+            # Botón de fusionar
+            def make_fusion_handler(c1=carta1, c2=carta2, res=resultado, win=ventana):
+                return lambda: self._ejecutar_fusion(c1, c2, res, win)
+            
+            tk.Button(
+                fusion_frame,
+                text=" Realizar Fusión",
+                command=make_fusion_handler(),
+                bg="#27ae60",
+                fg="white",
+                font=("Helvetica", 10, "bold")
+            ).pack(pady=5)
+        
+        # Botón de cancelar
+        tk.Button(
+            ventana,
+            text=" Cancelar",
+            command=ventana.destroy,
+            bg="#e74c3c",
+            fg="white",
+            width=20
+        ).pack(pady=10)
+    
+    def _ejecutar_fusion(self, carta1, carta2, resultado, ventana):
+        """Ejecuta la fusión seleccionada"""
+        exito, msg = self.juego.fusionar_cartas(carta1, carta2)
+        
+        if exito:
+            ventana.destroy()
+            messagebox.showinfo(
+                " Fusión Exitosa",
+                f"Has fusionado:\n{carta1.nombre} + {carta2.nombre}\n\n"
+                f"Resultado: {resultado.nombre}\n"
+                f"ATK: {resultado.atk} | DEF: {resultado.defensa}"
+            )
+            try:
+                self.actualizar_interfaz()
+            except Exception:
+                pass
+        else:
+            messagebox.showerror("Error", msg)

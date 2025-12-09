@@ -6,6 +6,8 @@ from modelo.fusionador import Fusionador
 class Juego:
     """Controla la lógica principal del juego de Yu-Gi-Oh!"""
     
+    # Agregar estas líneas al método __init__ de la clase Juego:
+
     def __init__(self, cartas_totales, tamanio_deck=20):
         """
         Inicializa el juego.
@@ -26,14 +28,32 @@ class Juego:
         self.fase = "inicio"
         self.historial = []
         
+        # Inicializar fusionador
         self.fusionador = Fusionador()
-        self.ia = IAMinimax(profundidad=2)  # Reducir profundidad para velocidad
+        
+        # IMPORTANTE: Cargar cartas de fusión separadas
+        # Estas son las cartas violetas que se usan como resultado
+        self.cartas_fusion = []
+        
+        # Inicializar IA con referencias al fusionador y cartas
+        self.ia = IAMinimax(profundidad=2)
         self.ia.fusionador = self.fusionador
+        self.ia.cartas_disponibles = self.cartas_fusion  # Usar cartas de fusión
         
         self.ganador = None
         
         # Callback para actualizar interfaz
         self.on_actualizar_interfaz = None
+    
+    def cargar_cartas_fusion(self, cartas_fusion):
+        """
+        Carga las cartas de fusión (violetas) disponibles.
+        Estas son las cartas que se obtienen como resultado de fusionar.
+        """
+        self.cartas_fusion = cartas_fusion
+        self.fusionador.cargar_cartas_fusion(cartas_fusion)
+        if self.ia:
+            self.ia.cartas_disponibles = cartas_fusion
     
     def inicializar_juego(self):
         """Prepara el juego con decks aleatorios"""
@@ -114,6 +134,24 @@ class Juego:
         
         if mejor_accion:
             tipo, datos = mejor_accion
+
+            # ← AGREGAR ESTE BLOQUE COMPLETO
+            if tipo == "fusionar":
+                carta1, carta2, resultado = datos
+                c1 = next((c for c in self.jugador_ia.mano if c.nombre == carta1.nombre), None)
+                c2 = next((c for c in self.jugador_ia.mano if c.nombre == carta2.nombre and c != c1), None)
+                
+                if c1 and c2:
+                    self.jugador_ia.mano.remove(c1)
+                    self.jugador_ia.mano.remove(c2)
+                    self.jugador_ia.cementerio.append(c1)
+                    self.jugador_ia.cementerio.append(c2)
+                    self.jugador_ia.mano.append(resultado)
+                    
+                    self.agregar_historial(f"⚗️ IA fusionó: {c1.nombre} + {c2.nombre} = {resultado.nombre} (ATK: {resultado.atk})")
+                    
+                    if self.on_actualizar_interfaz:
+                        self.on_actualizar_interfaz()
             
             # FASE 1: INVOCAR (si Minimax lo decide)
             if tipo == "jugar":
@@ -267,10 +305,17 @@ class Juego:
         if self.turno_actual != self.jugador_humano:
             return False, "No es tu turno"
         
-        resultado = self.fusionador.puede_fusionar(carta1, carta2, self.cartas_disponibles)
+        # IMPORTANTE: Usar cartas_fusion (violetas) como disponibles
+        cartas_fusion_disponibles = self.cartas_fusion if hasattr(self, 'cartas_fusion') and self.cartas_fusion else []
+        
+        if not cartas_fusion_disponibles:
+            return False, "No hay cartas de fusión disponibles en el sistema"
+        
+        # Intentar fusionar usando las cartas de fusión
+        resultado = self.fusionador.puede_fusionar(carta1, carta2, cartas_fusion_disponibles)
         
         if resultado:
-            # Remover cartas usadas
+            # Remover cartas usadas de la mano
             self.jugador_humano.mano.remove(carta1)
             self.jugador_humano.mano.remove(carta2)
             self.jugador_humano.cementerio.append(carta1)
@@ -279,7 +324,7 @@ class Juego:
             # Agregar resultado a la mano
             self.jugador_humano.mano.append(resultado)
             
-            self.agregar_historial(f" Fusión exitosa: {carta1.nombre} + {carta2.nombre} = {resultado.nombre}")
+            self.agregar_historial(f"Fusión exitosa: {carta1.nombre} + {carta2.nombre} = {resultado.nombre} (ATK: {resultado.atk})")
             return True, resultado
         
         return False, "Fusión no disponible"

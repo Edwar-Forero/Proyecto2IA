@@ -7,6 +7,57 @@ class Controlador:
     def __init__(self):
         self.cartas = []
         self.juego = None
+
+    # Agregar estos métodos a la clase Controlador
+
+    def cargar_cartas_fusion_desde_json(self, ruta_json="datos/fusiones.json"):
+        """Carga las cartas de fusión (violetas) desde JSON"""
+        try:
+            with open(ruta_json, 'r', encoding='utf-8') as f:
+                datos = json.load(f)
+            
+            cartas_fusion = []
+            
+            for carta_data in datos:
+                # Extraer información relevante
+                id_carta = carta_data.get('id')
+                nombre = carta_data.get('name', 'Desconocido')
+                atk = carta_data.get('atk', 0)
+                defensa = carta_data.get('def', 0)
+                nivel = carta_data.get('level', 1)
+                atributo = carta_data.get('attribute', 'DARK')
+                tipo = carta_data.get('race', 'Warrior')
+                
+                # Ruta de la imagen
+                imagen_path = f"datos/imagenes/{id_carta}.jpg"
+                
+                # Crear objeto Carta
+                from modelo.carta import Carta
+                carta = Carta(
+                    id=id_carta,
+                    nombre=nombre,
+                    atk=atk,
+                    defensa=defensa,
+                    nivel=nivel,
+                    atributo=atributo,
+                    tipo=tipo,
+                    imagen_path=imagen_path
+                )
+                
+                cartas_fusion.append(carta)
+            
+            print(f" {len(cartas_fusion)} cartas de fusión cargadas exitosamente")
+            return cartas_fusion
+        
+        except FileNotFoundError:
+            print(f" Error: No se encontró el archivo {ruta_json}")
+            return []
+        except json.JSONDecodeError:
+            print(f" Error: El archivo JSON está mal formado")
+            return []
+        except Exception as e:
+            print(f" Error inesperado: {e}")
+            return []
     
     def cargar_cartas_desde_json(self, ruta_json="datos/normales.json"):
         try:
@@ -64,10 +115,20 @@ class Controlador:
             print(f" Advertencia: Solo hay {len(self.cartas)} cartas disponibles")
             tamanio_deck = len(self.cartas) // 2
         
+        from modelo.juego import Juego
         self.juego = Juego(self.cartas, tamanio_deck)
+        
+        # IMPORTANTE: Cargar cartas de fusión
+        cartas_fusion = self.cargar_cartas_fusion_desde_json()
+        if cartas_fusion:
+            self.juego.cargar_cartas_fusion(cartas_fusion)
+            print(f" Cartas de fusión cargadas en el juego")
+        else:
+            print(f" No se pudieron cargar cartas de fusión")
+        
         self.juego.inicializar_juego()
         
-        print(f"Juego inicializado con decks de {tamanio_deck} cartas")
+        print(f" Juego inicializado con decks de {tamanio_deck} cartas")
         return self.juego
     
     def obtener_estadisticas_cartas(self):
