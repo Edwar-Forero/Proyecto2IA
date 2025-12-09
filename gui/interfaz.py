@@ -35,6 +35,8 @@ class InterfazYuGiOh:
         # Cache de imágenes
         self.imagenes_cache = {}
 
+        self.juego.root = self.root
+
         # conectar callback del juego
         self.juego.on_actualizar_interfaz = self.actualizar_interfaz
 
@@ -127,6 +129,25 @@ class InterfazYuGiOh:
         self._crear_panel_derecho(right)
 
     def _crear_tablero(self, parent):
+        # Mano IA (arriba) - NUEVO
+        mano_ia_container = tk.Frame(parent, bg="#071025", height=180)
+        mano_ia_container.pack(side=tk.TOP, fill=tk.X, pady=(4,10))
+        mano_ia_container.pack_propagate(False)
+
+        tk.Label(mano_ia_container, text="Mano IA", bg="#071025", fg="#f35b5b", font=("Helvetica", 10, "bold")).pack(anchor="w", padx=8, pady=(6,0))
+
+        self.canvas_mano_ia = tk.Canvas(mano_ia_container, bg="#071025", height=100, highlightthickness=0)
+        self.hscroll_mano_ia = tk.Scrollbar(mano_ia_container, orient=tk.HORIZONTAL, command=self.canvas_mano_ia.xview)
+        self.canvas_mano_ia.configure(xscrollcommand=self.hscroll_mano_ia.set)
+        self.canvas_mano_ia.pack(side=tk.TOP, fill=tk.X, expand=True, padx=8)
+        self.hscroll_mano_ia.pack(side=tk.TOP, fill=tk.X, padx=8)
+
+        self.frame_mano_ia = tk.Frame(self.canvas_mano_ia, bg="#071025")
+        self.canvas_mano_ia.create_window((0,0), window=self.frame_mano_ia, anchor="nw")
+
+        def _on_mano_ia_config(event):
+            self.canvas_mano_ia.configure(scrollregion=self.canvas_mano_ia.bbox("all"))
+        self.frame_mano_ia.bind("<Configure>", _on_mano_ia_config)
         # Campo IA
         campo_ia_frame = tk.Frame(parent, bg="#0b1220")
         campo_ia_frame.pack(side=tk.TOP, fill=tk.X, pady=(6,20))
@@ -433,6 +454,18 @@ class InterfazYuGiOh:
                     child.unbind("<Button-1>")
                     if self.modo_seleccion != "atacar":
                         child.config(cursor="")
+
+        # Mano de la IA
+        for w in self.frame_mano_ia.winfo_children(): w.destroy()
+        mano_ia = estado['ia'].get('mano', [])
+        for carta in mano_ia:
+            cont = tk.Frame(self.frame_mano_ia, bg="#071025", bd=0, padx=6)
+            cont.pack(side=tk.LEFT, padx=6, pady=6)
+            img = self.cargar_imagen_carta(carta, width=80, height=110)
+            lbl = tk.Label(cont, image=img, bg="#071025")
+            lbl.image = img
+            lbl.pack()
+            tk.Label(cont, text=carta.nombre[:15], bg="#071025", fg="#f35b5b", font=("Helvetica",7)).pack()
 
         # Mano del jugador
         for w in self.frame_mano.winfo_children(): w.destroy()
