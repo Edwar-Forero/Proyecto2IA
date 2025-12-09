@@ -8,10 +8,8 @@ class IAMinimax:
         self.fusionador = None
     
     def evaluar_estado(self, jugador_max, jugador_min):
-        """
-        Evalúa el estado actual del juego.
-        Retorna un valor positivo si favorece al maximizador, negativo al minimizador.
-        """
+        # Evalúa el estado actual del juego. Retorna un valor positivo si favorece al maximizador, negativo al minimizador.
+
         # Diferencia de puntos de vida
         diferencia_vida = jugador_max.puntos_vida - jugador_min.puntos_vida
         
@@ -40,7 +38,7 @@ class IAMinimax:
         return evaluacion
     
     def minimax(self, jugador_max, jugador_min, profundidad, alfa, beta, es_maximizador):
-        """Algoritmo Minimax con poda alfa-beta"""
+        # Algoritmo Minimax con poda alfa-beta
         # Condiciones de parada
         if profundidad == 0 or jugador_max.esta_derrotado() or jugador_min.esta_derrotado():
             return self.evaluar_estado(jugador_max, jugador_min)
@@ -101,7 +99,7 @@ class IAMinimax:
             return min_eval
     
     def _generar_acciones(self, jugador, oponente):
-        """Genera acciones posibles con estrategia inteligente"""
+        # Genera acciones posibles con estrategia inteligente
         acciones = []
         
         # 1. INVOCAR - Solo si no ha invocado en este turno
@@ -224,7 +222,7 @@ class IAMinimax:
                 carta_en_campo.cambiar_posicion()
     
     def _simular_batalla(self, atacante, defensor, atacante_jugador, defensor_jugador):
-        """Simula batalla para clones según reglas de Forbidden Memories"""
+        # Simula batalla para clones según reglas de Forbidden Memories
         if defensor.posicion == "ataque":
             # Batalla ATK vs ATK - Daño al jugador por diferencia
             if atacante.atk > defensor.atk:
@@ -251,7 +249,7 @@ class IAMinimax:
             # Si son iguales, no pasa nada
     
     def elegir_mejor_jugada(self, ia_jugador, oponente):
-        """Elige la mejor jugada usando Minimax con priorización inteligente"""
+        # Elige la mejor jugada usando Minimax con priorización inteligente
         mejor_accion = None
         mejor_valor = -math.inf
         

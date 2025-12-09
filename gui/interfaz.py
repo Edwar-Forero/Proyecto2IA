@@ -6,21 +6,14 @@ from PIL import Image, ImageTk, ImageOps
 import os
 
 class InterfazYuGiOh:
-    """
-    Interfaz reorganizada tipo tablero Yu-Gi-Oh:
-    - Campo central con 5 slots arriba (IA) y 5 abajo (Jugador).
-    - Mano con scroll horizontal en la parte inferior.
-    - Panel derecho: controles, indicador de turno y log.
-    - Permite configurar tamanio_deck y reiniciar.
-    - Soporta modo ataque y defensa.
-    """
-
+    
     SLOT_COUNT = 5
     CARD_W = 100
     CARD_H = 140
     MINI_W = 48 
     MINI_H = 68
 
+    # Metodo para inicializar la clase
     def __init__(self, root, juego):
         self.root = root
         self.juego = juego
@@ -55,10 +48,9 @@ class InterfazYuGiOh:
         except Exception:
             pass
 
-    
+    # Crea un contenedor principal con scroll vertical para toda la interfaz.
     def _crear_contenedor_scroll(self):
-        """Crea un contenedor principal con scroll vertical para TODA la interfaz."""
-
+       
         # Canvas para mover toda la interfaz
         self.root_canvas = tk.Canvas(
             self.root,
@@ -113,25 +105,25 @@ class InterfazYuGiOh:
         tk.Button(topbar, text="Configurar Deck", command=self._abrir_config_deck).pack(side=tk.LEFT, padx=8)
         tk.Button(topbar, text="Reiniciar Juego", command=self._reiniciar_desde_interfaz).pack(side=tk.LEFT, padx=8)
 
-        # Main area: center board / right controls
+        # Main area: tablero + panel derecho
         main = tk.Frame(parent, bg="#081426")
         main.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=(8,0), pady=8)
 
 
-        # Center panel: Board (IA arriba, jugador abajo)
+        # Centrar panel
         center = tk.Frame(main, bg="#0b1220")
         center.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self._crear_tablero(center)
 
-        # Right panel: controles y log
+        # Panel derecho: controles y log
         right = tk.Frame(main, bg="#071025", width=340)
         right.pack(side=tk.RIGHT, fill=tk.Y, padx=(0,0), anchor="ne")
         right.pack_propagate(False)
         self._crear_panel_derecho(right)
 
     def _crear_tablero(self, parent):
-        # Mano IA (arriba) - NUEVO
+        # Mano de la IA
         mano_ia_container = tk.Frame(parent, bg="#071025", height=180)
         mano_ia_container.pack(side=tk.TOP, fill=tk.X, pady=(4,10))
         mano_ia_container.pack_propagate(False)
@@ -150,9 +142,11 @@ class InterfazYuGiOh:
         def _on_mano_ia_config(event):
             self.canvas_mano_ia.configure(scrollregion=self.canvas_mano_ia.bbox("all"))
         self.frame_mano_ia.bind("<Configure>", _on_mano_ia_config)
+
         # Campo IA
         campo_ia_frame = tk.Frame(parent, bg="#0b1220")
         campo_ia_frame.pack(side=tk.TOP, fill=tk.X, pady=(6,20))
+
         # Info IA: LP y deck count
         info_ia = tk.Frame(campo_ia_frame, bg="#071025")
         info_ia.pack(side=tk.TOP, fill=tk.X, padx=12, pady=(2,6))
@@ -299,7 +293,7 @@ class InterfazYuGiOh:
         self.log_text.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
 
     def cargar_imagen_carta(self, carta, width=None, height=None, thumbnail=False):
-        """Carga imagen, cachea y devuelve PhotoImage"""
+        # Carga imagen, cachea y devuelve PhotoImage
         if width is None: width = self.CARD_W
         if height is None: height = self.CARD_H
         key = f"{getattr(carta,'id', id(carta))}_{width}_{height}"
@@ -331,9 +325,8 @@ class InterfazYuGiOh:
             w.destroy()
 
     # Agregar este método a la clase InterfazYuGiOh:
-    
     def actualizar_botones_acciones(self):
-        """Actualiza el estado de los botones según las acciones realizadas"""
+        # Actualiza el estado de los botones según las acciones realizadas
         es_turno_jugador = self.juego.turno_actual == self.juego.jugador_humano
         
         if not es_turno_jugador:
@@ -372,9 +365,8 @@ class InterfazYuGiOh:
         self.btn_terminar_turno.config(state=tk.NORMAL)
     
     # Modificar el método cambiar_posicion_carta para usar la lógica del juego:
-    
     def cambiar_posicion_carta(self, carta):
-        """Cambia la posición de una carta en el campo"""
+        # Cambia la posición de una carta en el campo
         if not carta:
             return
         
@@ -390,7 +382,7 @@ class InterfazYuGiOh:
             pass
 
     def actualizar_interfaz(self):
-        """Lee el estado del juego y actualiza toda la UI"""
+        # Lee el estado del juego y actualiza toda la UI
         estado = self.juego.obtener_estado_juego()
 
         # Actualizar info básica
@@ -567,7 +559,7 @@ class InterfazYuGiOh:
             self.mostrar_ganador(estado['ganador'])
 
     def seleccionar_carta_mano(self, carta):
-        """Invocar carta del jugador - permite elegir posición"""
+        # Invocar carta del jugador - permite elegir posición
         if self.juego.turno_actual != self.juego.jugador_humano:
             messagebox.showwarning("Advertencia", "No es tu turno")
             return
@@ -636,7 +628,7 @@ class InterfazYuGiOh:
         tk.Button(action_btn_frame, text="✗ Cancelar", command=cancelar, bg="#e74c3c", fg="white", width=12).pack(side=tk.LEFT, padx=10)
 
     def seleccionar_carta_campo(self, carta):
-        """Selecciona carta atacante (modo atacar)"""
+        # Selecciona carta atacante (modo atacar)
         if self.modo_seleccion != "atacar":
             return
         if not carta:
@@ -693,7 +685,7 @@ class InterfazYuGiOh:
             pass
 
     def modo_cambiar_posicion(self):
-        """Activa modo cambiar posición"""
+        # Activa modo cambiar posición
         if self.juego.turno_actual != self.juego.jugador_humano:
             messagebox.showwarning("Advertencia", "No es tu turno")
             return
@@ -715,7 +707,7 @@ class InterfazYuGiOh:
             pass
 
     def cambiar_posicion_carta(self, carta):
-        """Cambia la posición de una carta en el campo"""
+        # Cambia la posición de una carta en el campo
         if not carta:
             return
         
@@ -749,7 +741,7 @@ class InterfazYuGiOh:
             pass
 
     def terminar_turno(self):
-        """Terminar turno"""
+        # Terminar turno
         if self.juego.turno_actual != self.juego.jugador_humano:
             messagebox.showwarning("Advertencia", "No es tu turno")
             return
@@ -762,16 +754,15 @@ class InterfazYuGiOh:
             pass
 
     def _abrir_config_deck(self):
-        """Pide al usuario el tamaño del deck"""
+        # Pide al usuario el tamaño del deck
         current = getattr(self.juego, "tamanio_deck", 20)
         val = simpledialog.askinteger("Config Deck", "Tamaño del deck por jugador (10-40):", initialvalue=current, minvalue=10, maxvalue=40)
         if val:
             self.juego.tamanio_deck = min(max(10, val), 40)
             self._reiniciar_desde_interfaz()
 
+    # Reinicia el juego, limpia visuales y fuerza el estado lógico a 0
     def _reiniciar_desde_interfaz(self):
-        """Reinicia el juego, limpia visuales y fuerza el estado lógico a 0"""
-        
         # 1. Cancelar cualquier acción pendiente primero
         self.cancelar_accion() 
 
@@ -802,12 +793,7 @@ class InterfazYuGiOh:
         # 4. Reiniciar la lógica interna del juego
         self.juego.inicializar_juego()
         
-        # --- CORRECCIÓN CRÍTICA ---
-        # Forzamos la bandera de invocación a False.
-        # Esto asegura que, aunque reinicies tras haber invocado, 
-        # el nuevo juego sepa que aún no has invocado en este nuevo turno 1.
         self.juego.humano_invoco_carta = False 
-        # --------------------------
         
         # 5. Volver a pintar la interfaz con el juego limpio
         try:
@@ -816,7 +802,7 @@ class InterfazYuGiOh:
             print(f"Error actualizando interfaz tras reinicio: {e}")
 
     def mostrar_ganador(self, ganador):
-        """Muestra el diálogo de fin de juego"""
+        # Muestra el diálogo de fin de juego
         nombre = ganador if isinstance(ganador, str) else getattr(ganador, "nombre", str(ganador))
         
         self.juego.ganador = None
@@ -828,11 +814,9 @@ class InterfazYuGiOh:
         else:
             self.root.quit()
 
-    # ========== MÉTODOS DE FUSIÓN ==========
-    # Agregar estos métodos a la clase InterfazYuGiOh
-    
+    # MÉTODOS DE FUSIÓN 
     def modo_fusionar(self):
-        """Activa el modo de fusión"""
+        # Activa el modo de fusión
         if self.juego.turno_actual != self.juego.jugador_humano:
             messagebox.showwarning("Advertencia", "No es tu turno")
             return
@@ -841,10 +825,8 @@ class InterfazYuGiOh:
             messagebox.showwarning("Advertencia", "Necesitas al menos 2 cartas en tu mano para fusionar")
             return
         
-        # IMPORTANTE: Usar cartas de FUSIÓN (violetas) como disponibles
         cartas_fusion_disponibles = self.juego.cartas_fusion if hasattr(self.juego, 'cartas_fusion') else []
         
-        # Debug: Mostrar información
         print(f" DEBUG Fusiones:")
         print(f"  - Cartas en mano: {len(self.juego.jugador_humano.mano)}")
         print(f"  - Cartas de fusión disponibles: {len(cartas_fusion_disponibles)}")
@@ -856,7 +838,7 @@ class InterfazYuGiOh:
         # Obtener fusiones posibles usando las cartas de fusión
         fusiones_posibles = self.juego.fusionador.obtener_fusiones_posibles(
             self.juego.jugador_humano.mano,
-            cartas_fusion_disponibles  # Usar cartas violetas
+            cartas_fusion_disponibles
         )
         
         print(f"  - Fusiones posibles encontradas: {len(fusiones_posibles)}")
@@ -875,7 +857,7 @@ class InterfazYuGiOh:
         self._mostrar_ventana_fusiones(fusiones_posibles)
     
     def _mostrar_ventana_fusiones(self, fusiones_posibles):
-        """Muestra una ventana con todas las fusiones disponibles"""
+        # Muestra una ventana con todas las fusiones disponibles
         ventana = tk.Toplevel(self.root)
         ventana.title(" Fusiones Disponibles")
         ventana.geometry("700x600")
@@ -977,7 +959,7 @@ class InterfazYuGiOh:
         ).pack(pady=10)
     
     def _ejecutar_fusion(self, carta1, carta2, resultado, ventana):
-        """Ejecuta la fusión seleccionada"""
+        # Ejecuta la fusión seleccionada
         exito, msg = self.juego.fusionar_cartas(carta1, carta2)
         
         if exito:

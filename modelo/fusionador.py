@@ -1,18 +1,13 @@
 class Fusionador:
-    """Maneja las fusiones de cartas según las reglas de Forbidden Memories"""
-    
+    # Maneja las fusiones de cartas según las reglas de Forbidden Memories
     def __init__(self):
-        # Diccionario de fusiones: (id1, id2) -> resultado
+        # Diccionario de fusiones
         self.fusiones = {}
         self.cartas_fusion = []  # Cartas violetas disponibles para resultados
         self._inicializar_fusiones()
     
     def _inicializar_fusiones(self):
-        """
-        Define las fusiones disponibles.
-        Formato: (carta1_nombre, carta2_nombre): resultado_nombre
-        """
-        # Fusiones específicas por nombre (limitadas para evitar muchas fusiones)
+        # Fusiones específicas por nombre
         self.fusiones_nombres = {
             # Solo algunas fusiones clave
             ("Dark Magician", "Mystical Elf"): "Dark Sage",
@@ -21,21 +16,10 @@ class Fusionador:
         }
     
     def cargar_cartas_fusion(self, cartas_fusion):
-        """Carga las cartas de fusión (violetas) disponibles como resultados"""
+        # Carga las cartas de fusión disponibles como resultados
         self.cartas_fusion = cartas_fusion
     
     def puede_fusionar(self, carta1, carta2, cartas_disponibles):
-        """
-        Verifica si dos cartas pueden fusionarse.
-        
-        Args:
-            carta1: Primera carta
-            carta2: Segunda carta
-            cartas_disponibles: Lista de cartas de FUSIÓN disponibles (violetas)
-        
-        Returns:
-            Carta resultante or None si no es posible
-        """
         # Intentar fusión por nombre exacto (prioridad más alta)
         clave1 = (carta1.nombre, carta2.nombre)
         clave2 = (carta2.nombre, carta1.nombre)
@@ -52,13 +36,13 @@ class Fusionador:
                 if carta.nombre == nombre_resultado:
                     return carta.clonar()
         
-        # IMPORTANTE: SIEMPRE intentar fusión por atributo si son iguales
+        # Intentar fusión por atributo si son iguales
         if carta1.atributo == carta2.atributo:
             resultado = self._fusion_por_atributo(carta1, carta2, cartas_disponibles)
             if resultado:
                 return resultado
         
-        # IMPORTANTE: SIEMPRE intentar fusión por tipo si son iguales
+        # Intentar fusión por tipo si son iguales
         if carta1.tipo == carta2.tipo:
             resultado = self._fusion_por_tipo(carta1, carta2, cartas_disponibles)
             if resultado:
@@ -73,7 +57,7 @@ class Fusionador:
         return None
     
     def _fusion_por_atributo(self, carta1, carta2, cartas_disponibles):
-        """Fusión genérica basada en atributo compartido"""
+        # Fusión genérica basada en atributo compartido
         atk_promedio = (carta1.atk + carta2.atk) // 2
         atributo = carta1.atributo
         
@@ -94,7 +78,7 @@ class Fusionador:
         return None
     
     def _fusion_por_tipo(self, carta1, carta2, cartas_disponibles):
-        """Fusión genérica basada en tipo compartido"""
+        # Fusión genérica basada en tipo compartido
         atk_promedio = (carta1.atk + carta2.atk) // 2
         tipo = carta1.tipo
         
@@ -114,7 +98,7 @@ class Fusionador:
         return None
     
     def _fusion_generica(self, carta1, carta2, cartas_disponibles):
-        """Fusión genérica cuando no comparten atributo ni tipo"""
+        # Fusión genérica cuando no comparten atributo ni tipo
         atk_promedio = (carta1.atk + carta2.atk) // 2
         
         # Buscar cualquier carta de fusión con stats razonables
@@ -134,16 +118,6 @@ class Fusionador:
         return None
     
     def obtener_fusiones_posibles(self, mano, cartas_disponibles):
-        """
-        Retorna todas las fusiones posibles con las cartas en mano.
-        
-        Args:
-            mano: Lista de cartas en la mano
-            cartas_disponibles: Lista de cartas de FUSIÓN del juego (violetas)
-        
-        Returns:
-            Lista de tuplas (carta1, carta2, resultado)
-        """
         fusiones = []
         
         for i in range(len(mano)):
@@ -155,12 +129,7 @@ class Fusionador:
         return fusiones
     
     def es_fusion_beneficiosa(self, carta1, carta2, resultado):
-        """
-        Evalúa si una fusión es beneficiosa
-        
-        Returns:
-            bool: True si la fusión mejora significativamente las stats
-        """
+        # Verifica si la fusión es beneficiosa comparando stats
         atk_total_original = carta1.atk + carta2.atk
         def_total_original = carta1.defensa + carta2.defensa
         

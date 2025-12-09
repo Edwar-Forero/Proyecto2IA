@@ -4,16 +4,8 @@ from modelo.ia_minimax import IAMinimax
 from modelo.fusionador import Fusionador
 
 class Juego:
-    """Controla la lógica principal del juego de Yu-Gi-Oh!"""
     
     def __init__(self, cartas_totales, tamanio_deck=20):
-        """
-        Inicializa el juego.
-        
-        Args:
-            cartas_totales: Lista de todas las cartas disponibles
-            tamanio_deck: Número de cartas por deck (máximo 40)
-        """
         # === BANDERAS DE ACCIONES POR TURNO ===
         # Jugador Humano
         self.humano_invoco_carta = False
@@ -53,14 +45,14 @@ class Juego:
         self.on_actualizar_interfaz = None
     
     def cargar_cartas_fusion(self, cartas_fusion):
-        """Carga las cartas de fusión (violetas) disponibles."""
+        # Carga las cartas de fusión disponibles
         self.cartas_fusion = cartas_fusion
         self.fusionador.cargar_cartas_fusion(cartas_fusion)
         if self.ia:
             self.ia.cartas_disponibles = cartas_fusion
     
     def resetear_acciones_turno(self, jugador_tipo="humano"):
-        """Resetea las banderas de acciones al inicio de cada turno"""
+        # Resetea las banderas de acciones al inicio de cada turno
         if jugador_tipo == "humano":
             self.humano_invoco_carta = False
             self.humano_fusiono = False
@@ -73,7 +65,7 @@ class Juego:
             self.ia_cambio_posicion = False
     
     def inicializar_juego(self):
-        """Prepara el juego con decks aleatorios"""
+        # Prepara el juego con decks aleatorios
         self.ganador = None
         self.historial = []
         
@@ -105,7 +97,7 @@ class Juego:
         self.agregar_historial("El juego ha comenzado. Es tu turno.")
     
     def cambiar_turno(self):
-        """Cambia al siguiente turno manejando el ciclo completo Jugador -> IA -> Jugador"""
+        # Cambia al siguiente turno manejando el ciclo completo Jugador -> IA -> Jugador
         
         if self.turno_actual == self.jugador_humano:
             self.turno_actual = self.jugador_ia
@@ -145,7 +137,7 @@ class Juego:
                 self.agregar_historial("¡Tu deck está vacío! No puedes robar.")
     
     def ejecutar_turno_ia(self):
-        """Ejecuta el turno completo de la IA usando MINIMAX para decisiones estratégicas"""
+        # Ejecuta el turno completo de la IA usando MINIMAX para decisiones estratégicas
         self.agregar_historial("--- Turno de la IA ---")
         
         # Usar Minimax para obtener la mejor acción
@@ -230,7 +222,7 @@ class Juego:
         self.verificar_ganador()
     
     def jugar_carta_humano(self, carta, posicion="ataque"):
-        """El jugador humano invoca una carta"""
+        # El jugador humano invoca una carta
         if self.turno_actual != self.jugador_humano:
             return False, "No es tu turno"
         
@@ -273,7 +265,7 @@ class Juego:
         return True, "Ataque realizado"
     
     def ataque_directo_humano(self, atacante):
-        """Ataque directo a los puntos de vida del oponente"""
+        # Ataque directo a los puntos de vida del oponente
         if self.humano_ataco:
             return False, "Ya atacaste este turno"
             
@@ -288,7 +280,7 @@ class Juego:
         return False, "El oponente tiene cartas en el campo"
     
     def realizar_batalla(self, atacante, defensor, atacante_jugador, defensor_jugador):
-        """Ejecuta una batalla entre dos cartas según las reglas de Forbidden Memories"""
+        # Ejecuta una batalla entre dos cartas según las reglas de Forbidden Memories
         self.agregar_historial(f"⚔ {atacante.nombre} ataca a {defensor.nombre}")
         
         if defensor.posicion == "ataque":
@@ -331,7 +323,7 @@ class Juego:
         self.verificar_ganador()
     
     def fusionar_cartas(self, carta1, carta2):
-        """Intenta fusionar dos cartas de la mano del jugador"""
+        # Intenta fusionar dos cartas de la mano del jugador
         if self.turno_actual != self.jugador_humano:
             return False, "No es tu turno"
         
@@ -364,7 +356,7 @@ class Juego:
         return False, "Fusión no disponible"
     
     def cambiar_posicion_carta(self, carta):
-        """Cambia la posición de una carta en el campo del jugador humano"""
+        # Cambia la posición de una carta en el campo del jugador humano
         if self.turno_actual != self.jugador_humano:
             return False, "No es tu turno"
         
@@ -382,8 +374,7 @@ class Juego:
         return True, "Posición cambiada exitosamente"
     
     def verificar_ganador(self):
-        """Verifica si hay un ganador"""
-        
+    
         # 1. Verificar si el Jugador Humano perdió
         if self.jugador_humano.esta_derrotado():
             self.ganador = self.jugador_ia
@@ -403,12 +394,12 @@ class Juego:
                 self.agregar_historial("¡Victoria! Has derrotado a la IA por DECK OUT (Deck, Mano y Campo vacíos).")
     
     def agregar_historial(self, mensaje):
-        """Agrega un mensaje al historial del juego"""
+        # Agrega un mensaje al historial del juego
         self.historial.append(mensaje)
         print(mensaje)
     
     def obtener_estado_juego(self):
-        """Retorna el estado actual del juego para la GUI"""
+        # Retorna el estado actual del juego para la GUI
         return {
             "jugador": {
                 "nombre": self.jugador_humano.nombre,

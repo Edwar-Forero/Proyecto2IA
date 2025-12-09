@@ -1,5 +1,5 @@
 class Carta:
-    """Representa una carta monstruo de Yu-Gi-Oh!"""
+    
     
     def __init__(self, id, nombre, atk, defensa, nivel, atributo, tipo, imagen_path):
         self.id = id
@@ -14,18 +14,18 @@ class Carta:
         self.posicion = "ataque"  # "ataque" o "defensa"
     
     def cambiar_posicion(self):
-        """Cambia entre posición de ataque y defensa"""
+        # Cambia entre posición de ataque y defensa
         self.posicion = "defensa" if self.posicion == "ataque" else "ataque"
     
     def obtener_poder(self):
-        """Retorna el poder actual según la posición"""
+        # Retorna el poder actual según la posición
         return self.atk if self.posicion == "ataque" else self.defensa
     
     def __repr__(self):
         return f"{self.nombre} (ATK:{self.atk}/DEF:{self.defensa})"
     
     def clonar(self):
-        """Crea una copia profunda de la carta"""
+        # Crea una copia profunda de la carta
         copia = Carta(
             self.id, self.nombre, self.atk, self.defensa,
             self.nivel, self.atributo, self.tipo, self.imagen_path

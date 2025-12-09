@@ -8,10 +8,9 @@ class Controlador:
         self.cartas = []
         self.juego = None
 
-    # Agregar estos métodos a la clase Controlador
-
+    
     def cargar_cartas_fusion_desde_json(self, ruta_json="datos/fusiones.json"):
-        """Carga las cartas de fusión (violetas) desde JSON"""
+        # Carga las cartas de fusión
         try:
             with open(ruta_json, 'r', encoding='utf-8') as f:
                 datos = json.load(f)
@@ -118,7 +117,7 @@ class Controlador:
         from modelo.juego import Juego
         self.juego = Juego(self.cartas, tamanio_deck)
         
-        # IMPORTANTE: Cargar cartas de fusión
+        # Carga cartas de fusión
         cartas_fusion = self.cargar_cartas_fusion_desde_json()
         if cartas_fusion:
             self.juego.cargar_cartas_fusion(cartas_fusion)
