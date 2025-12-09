@@ -41,8 +41,14 @@ class IAMinimax:
     
     def minimax(self, jugador_max, jugador_min, profundidad, alfa, beta, es_maximizador):
         """Algoritmo Minimax con poda alfa-beta"""
-        # Condiciones de parada
+    # Condiciones de parada (Aquí se usa la lógica de derrota por LP o Deck Out)
         if profundidad == 0 or jugador_max.esta_derrotado() or jugador_min.esta_derrotado():
+            # Si un jugador perdió, asigna un valor extremo
+            if jugador_max.esta_derrotado():
+                return -math.inf * (profundidad + 1) # Peor resultado, dar peso a la profundidad
+            if jugador_min.esta_derrotado():
+                return math.inf * (profundidad + 1) # Mejor resultado, dar peso a la profundidad
+                
             return self.evaluar_estado(jugador_max, jugador_min)
         
         jugador_actual = jugador_max if es_maximizador else jugador_min
